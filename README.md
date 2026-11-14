@@ -145,7 +145,18 @@ RETURN DISTINCT p.key AS key, p.pid AS pid
 A file is known by device, inode and birth time, not by its name, so a moved file is still yours and a new file
 that happens to reuse an inode number is not the agent's. A process is known by its pid and start time.
 
-### Why this needs Relate
+## How it uses Relate
+
+**Mode: directory.** Each agent session is its own Relate directory store, at `$WAKE_HOME/sessions/<id>/body/`.
+WAKE writes it in-process, through the embedded Python library, on every destructive system call. Relate's follow
+mode (`relate serve --read-only=live`), which needs a directory store, lets the live view read every write as it
+lands. A finished run can be packed into one `.rl` file with `wake export` (`relate clone`).
+
+**A real store to inspect:** [`examples/demo-run/`](examples/demo-run/) is the store from the demo run shown above.
+Open a copy with `relate -d /tmp/demo-run --read-only` and try the questions in
+[`examples/README.md`](examples/README.md).
+
+Why Relate, and not a database across a socket:
 
 - **It sits on the system-call path.** WAKE asks the graph on every destructive call. Relate runs inside the
   supervisor's own process and answers the ownership query in about 90 microseconds; a database across a socket

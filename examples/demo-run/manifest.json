@@ -1,0 +1,146 @@
+{
+  "format_version": 5,
+  "next_node_id": 161,
+  "next_rel_id": 171,
+  "checkpoint_lsn": 279,
+  "commit_ts": 285,
+  "node_parts": [
+    {
+      "path": "nodes/0-262144-223b29df3df84a6d5a378b69aa1bbc87.parquet",
+      "id_lo": 0,
+      "id_hi": 262144,
+      "rows": 161,
+      "bytes": 11024
+    }
+  ],
+  "rel_parts": [
+    {
+      "path": "relationships/0-262144-3c3b26d3a857607e9b9d3c7bcc6840b3.parquet",
+      "id_lo": 0,
+      "id_hi": 262144,
+      "rows": 171,
+      "bytes": 5651
+    }
+  ],
+  "bytes_per_node": 65.61726708074534,
+  "bytes_per_rel": 33.046783625730995,
+  "codec": "parquet",
+  "indexes": [
+    {
+      "name": "file_key",
+      "label": "File",
+      "property": "key"
+    },
+    {
+      "name": "file_path",
+      "label": "File",
+      "property": "path"
+    },
+    {
+      "name": "kept_key",
+      "label": "Kept",
+      "property": "key"
+    },
+    {
+      "name": "kept_path",
+      "label": "Kept",
+      "property": "path"
+    },
+    {
+      "name": "process_key",
+      "label": "Process",
+      "property": "key"
+    }
+  ],
+  "constraints": [],
+  "theater": {
+    "databases": {
+      "neo4j": [
+        25,
+        false
+      ],
+      "system": [
+        25,
+        false
+      ],
+      "system_ontologies": [
+        25,
+        false
+      ]
+    },
+    "index_details": {
+      "file_key": {
+        "kind": "Range",
+        "relationship": false,
+        "labels": [
+          "File"
+        ],
+        "properties": [
+          "key"
+        ],
+        "with_properties": []
+      },
+      "file_path": {
+        "kind": "Range",
+        "relationship": false,
+        "labels": [
+          "File"
+        ],
+        "properties": [
+          "path"
+        ],
+        "with_properties": []
+      },
+      "kept_key": {
+        "kind": "Range",
+        "relationship": false,
+        "labels": [
+          "Kept"
+        ],
+        "properties": [
+          "key"
+        ],
+        "with_properties": []
+      },
+      "kept_path": {
+        "kind": "Range",
+        "relationship": false,
+        "labels": [
+          "Kept"
+        ],
+        "properties": [
+          "path"
+        ],
+        "with_properties": []
+      },
+      "process_key": {
+        "kind": "Range",
+        "relationship": false,
+        "labels": [
+          "Process"
+        ],
+        "properties": [
+          "key"
+        ],
+        "with_properties": []
+      }
+    },
+    "index_options": {
+      "file_key": {},
+      "file_path": {},
+      "kept_key": {},
+      "kept_path": {},
+      "process_key": {}
+    },
+    "graph_types": {},
+    "current_graph_type": {
+      "node_types": [],
+      "edge_types": [],
+      "constraints": [],
+      "drop_constraint_names": []
+    },
+    "derived_constraints": {}
+  },
+  "query_engine": "in-memory",
+  "write_engine": "local"
+}
