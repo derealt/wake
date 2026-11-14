@@ -43,8 +43,19 @@ def cmd_run(argv):
         say(f"session {s.id}. Stop it with `wake stop`; watch it with `wake view`.")
     sup = Supervisor(s, stop_on_exit="--keep-running" not in opts,
                      triggers="--no-triggers" not in opts, sweep="--no-sweep" not in opts)
+    printed = []
+
+    def stopped(r):
+        if not quiet:
+            print_summary(r)
+            if r.get("adopted_running"):
+                say(f"{plural(r['adopted_running'], 'process', 'processes')} you adopted {'is' if r['adopted_running'] == 1 else 'are'} "
+                    "still running. WAKE stays out of the way and returns when they end.")
+        printed.append(True)
+
+    sup.on_stopped = stopped
     summary = sup.run(command, env)
-    if not quiet:
+    if not quiet and not printed:
         print_summary(summary)
     code = summary.get("exit", 0)
     sys.exit(code if isinstance(code, int) and code >= 0 else 128 + abs(code or 0))
@@ -163,9 +174,10 @@ def cmd_whose(args):
     if kept:
         first = kept[0]["chain"][0]
         print(f"{path} is yours: it was there before the agent touched it.")
+        verbs = {"overwritten": "wrote over", "deleted": "deleted", "replaced": "replaced", "moved": "moved"}
         for r in kept:
             p = r["chain"][1]
-            print(f"  {when(r['at'])}  the agent {r['how']} it: {p['pid']} `{(p.get('cmd') or '')[:80]}`")
+            print(f"  {when(r['at'])}  the agent {verbs.get(r['how'], r['how'])} it: {p['pid']} `{(p.get('cmd') or '')[:80]}`")
         print("  Your original is kept." + (" It has been put back." if first.get("restored") else
                                            " `wake restore " + path + "` puts it back."))
 

@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 LAB, HOME = "/tmp/lab", "/tmp/lab/human"
 UID = 10001
-ENV = {"HOME": HOME, "PATH": "/usr/local/bin:/usr/bin:/bin", "PYTHONPATH": REPO, "WAKE_HOME": f"{LAB}/wakehome",
+ENV = {"HOME": HOME, "PATH": os.path.dirname(sys.executable) + ":/usr/local/bin:/usr/bin:/bin", "PYTHONPATH": REPO, "WAKE_HOME": f"{LAB}/wakehome",
        "LANG": "C.UTF-8"}
 BEAT = f"{LAB}/beats"                     # anything of the agent's that runs touches a file here
 PAYLOAD = f"touch {BEAT}/$$.$(date +%s%N)"

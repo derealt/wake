@@ -24,7 +24,7 @@ LAB = "/tmp/lab"
 HOME = f"{LAB}/human"
 PROJ = f"{HOME}/project"
 UID = 10001
-ENV = {"HOME": HOME, "PATH": "/usr/local/bin:/usr/bin:/bin", "PYTHONPATH": REPO, "WAKE_HOME": f"{LAB}/wakehome",
+ENV = {"HOME": HOME, "PATH": os.path.dirname(sys.executable) + ":/usr/local/bin:/usr/bin:/bin", "PYTHONPATH": REPO, "WAKE_HOME": f"{LAB}/wakehome",
        "LANG": "C.UTF-8"}
 
 AGENT = r"""

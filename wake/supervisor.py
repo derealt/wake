@@ -89,8 +89,11 @@ class Supervisor:
         self.root = None
         self.root_status = None
         self.stopping = False
+        self.stop_done = None              # Law 2's summary, once everything it made has stopped
         self.stop_reason = None
         self.stop_asked = None
+        self.adopted = set()               # tgids you adopted: left running, no longer checked
+        self.on_stopped = None             # callback(summary) for the command line
         self.counts = Counter()
         self.log = open(session.events, "a", buffering=1)
         self.handlers = {}
@@ -152,6 +155,8 @@ class Supervisor:
             if self.stop_asked and not self.stopping:
                 self.begin_stop(self.stop_asked)
             busy = self.reap()
+            if self.stopping and self.stop_done is None and not self.unadopted():
+                self.complete_stop()
             if not self.tracees:
                 break
             if not busy:
@@ -164,6 +169,8 @@ class Supervisor:
                         pass
                 if ctl in ready:
                     self.serve_control(ctl)
+        if self.stopping and self.stop_done is None:
+            self.complete_stop()
         summary = self.finish()
         if ctl:
             ctl.close()
@@ -215,7 +222,7 @@ class Supervisor:
                 inject = sig
         except OSError:
             pass
-        if self.stopping:
+        if self.stopping and self.tracees.get(tid) not in self.adopted:
             self.kill_tid(tid)
         if tid in self.pending and resume == CONT:
             resume = SYSCALL
@@ -245,6 +252,8 @@ class Supervisor:
         child = new.value
         ptg = self.tracees.get(tid) or tgid_of(tid)
         ctg = tgid_of(child)
+        if ptg in self.adopted:
+            self.adopted.add(ctg)
         if ctg != ptg and ctg not in self.keys:
             key = proc_key(ctg)
             if key:
@@ -252,7 +261,7 @@ class Supervisor:
                 self.body.child(self.ensure(ptg), key, ctg)
         if child in self.held:
             self.held.discard(child)
-            if self.stopping:
+            if self.stopping and ctg not in self.adopted:
                 self.kill_tid(child)
             try:
                 ptrace(CONT, child, 0, 0)
@@ -299,6 +308,8 @@ class Supervisor:
         if not handler:
             return CONT
         pid = self.tracees.get(tid) or tgid_of(tid)
+        if pid in self.adopted:
+            return CONT                    # yours now: WAKE no longer checks it
         me = self.ensure(pid)
         self.counts["checked"] += 1
         try:
@@ -653,42 +664,65 @@ class Supervisor:
         self.stop_reason = reason
         self.stop_t0 = time.monotonic()
         self.note("stopping", reason=reason, tracees=len(self.tracees))
-        for tid in list(self.tracees):
-            self.kill_tid(tid)
+        for tid, tg in list(self.tracees.items()):
+            if tg not in self.adopted:
+                self.kill_tid(tid)
         for tid in list(self.held):
             try:
                 ptrace(CONT, tid, 0, 0)
             except OSError:
                 pass
 
-    def finish(self):
+    def unadopted(self):
+        return [t for t, tg in self.tracees.items() if tg not in self.adopted]
+
+    def complete_stop(self):
+        """Every process of the body is gone (except what you adopted): finish Law 2 and report."""
         removed, reverted, swept, escaped = [], [], [], []
-        if self.stopping:
-            if self.do_sweep:                 # first, while its planted files are still where it put them
-                swept = self.sweep()
-            if self.do_triggers:
-                removed, reverted = self.clean_triggers()
+        if self.do_sweep:                     # first, while its planted files are still where it put them
+            swept = self.sweep()
+        if self.do_triggers:
+            removed, reverted = self.clean_triggers()
         for r in self.body.alive():
-            if proc_key(r["pid"]) == r["key"] and self.stopping:
+            if proc_key(r["pid"]) == r["key"] and r["pid"] not in self.adopted:
                 try:
                     os.kill(r["pid"], signal.SIGKILL)
                     escaped.append(r["pid"])
                 except OSError:
                     pass
-            self.body.died(r["key"])
-        took = round((time.monotonic() - self.stop_t0) * 1000, 1) if self.stopping else None
+        self.stop_done = self.summary(removed, reverted, swept, escaped)
+        self.body.event("stopped", json.dumps(self.stop_done))
+        self.body.session_set(status="stopped", stopped=time.time())
+        self.note("stopped", **self.stop_done)
+        self.s.update(status="stopped", summary=self.stop_done)
+        if self.on_stopped:
+            self.on_stopped(self.stop_done)
+
+    def summary(self, removed=(), reverted=(), swept=(), escaped=()):
         c = self.body.counts()
-        summary = {"stopped": self.stopping, "reason": self.stop_reason, "ms": took,
-                   "removed_triggers": removed, "restored_triggers": reverted, "swept": swept,
-                   "escaped": escaped, "processes": c.get("processes"), "made": c.get("made"),
-                   "kept": c.get("kept"), "refused": c.get("refused"), "narrowed": self.counts["narrowed"],
-                   "checked": self.counts["checked"]}
+        r = {"stopped": self.stopping, "reason": self.stop_reason,
+             "ms": round((time.monotonic() - self.stop_t0) * 1000, 1) if self.stopping else None,
+             "removed_triggers": list(removed), "restored_triggers": list(reverted), "swept": list(swept),
+             "escaped": list(escaped), "processes": c.get("processes"), "made": c.get("made"),
+             "kept": c.get("kept"), "refused": c.get("refused"), "narrowed": self.counts["narrowed"],
+             "checked": self.counts["checked"], "adopted_running": len(self.adopted & set(self.tracees.values()))}
+        if self.root_status is not None:
+            r["exit"] = os.waitstatus_to_exitcode(self.root_status)
+        return r
+
+    def finish(self):
+        for r in self.body.q("MATCH (p:Process) WHERE p.alive RETURN p.key AS key"):
+            self.body.died(r["key"])
+        summary = self.stop_done or self.summary()
         if self.root_status is not None:
             summary["exit"] = os.waitstatus_to_exitcode(self.root_status)
-        self.body.event("stopped" if self.stopping else "finished", json.dumps(summary))
-        self.body.session_set(status="stopped" if self.stopping else "finished", ended=time.time())
+        if not self.stopping:
+            self.body.event("finished", json.dumps(summary))
+            self.body.session_set(status="finished", ended=time.time())
+            self.s.update(status="finished", summary=summary)
+        else:
+            self.body.session_set(ended=time.time())
         self.note("finished", **summary)
-        self.s.update(status="stopped" if self.stopping else "finished", summary=summary)
         self.body.close()
         return summary
 
@@ -803,6 +837,9 @@ class Supervisor:
                 if not key or not self.body.mine_process(key):
                     return {"ok": False, "error": f"process {target} is not one the agent started"}
                 self.body.adopt_process(key)
+                for r in self.body.q("MATCH (a:Process {key: $k})-[:SPAWNED]->*(d:Process) WHERE d.alive "
+                                     "RETURN d.pid AS pid", {"k": key}):
+                    self.adopted.add(r["pid"])
                 self.body.event("adopted", f"process {target} `{cmdline(int(target))}` is yours now")
                 return {"ok": True, "adopted": f"process {target}"}
             t = identity(target)
@@ -834,4 +871,5 @@ def offline_stop(session):
                 os.kill(r["pid"], signal.SIGKILL)
             except OSError:
                 pass
+    sup.complete_stop()
     return sup.finish()

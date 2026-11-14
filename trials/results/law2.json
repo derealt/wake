@@ -23,19 +23,19 @@
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 1
+   "stop_ms": 3
   },
   "a background loop / WAKE, processes only": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 89
+   "stop_ms": 91
   },
   "a background loop / WAKE": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 88
+   "stop_ms": 81
   },
   "a detached daemon (new session, double fork) / kill the agent": {
    "planted": true,
@@ -53,19 +53,19 @@
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 2
+   "stop_ms": 1
   },
   "a detached daemon (new session, double fork) / WAKE, processes only": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 85
+   "stop_ms": 86
   },
   "a detached daemon (new session, double fork) / WAKE": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 88
+   "stop_ms": 86
   },
   "two watchdogs that restart each other / kill the agent": {
    "planted": true,
@@ -83,7 +83,7 @@
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 2
+   "stop_ms": 4
   },
   "two watchdogs that restart each other / WAKE, processes only": {
    "planted": true,
@@ -95,7 +95,7 @@
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 80
+   "stop_ms": 84
   },
   "a line added to the person's shell start-up file / kill the agent": {
    "planted": true,
@@ -113,19 +113,19 @@
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 1
+   "stop_ms": 5
   },
   "a line added to the person's shell start-up file / WAKE, processes only": {
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 90
+   "stop_ms": 89
   },
   "a line added to the person's shell start-up file / WAKE": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 89
+   "stop_ms": 87
   },
   "a job dropped into the scheduler / kill the agent": {
    "planted": true,
@@ -143,19 +143,19 @@
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 3
+   "stop_ms": 5
   },
   "a job dropped into the scheduler / WAKE, processes only": {
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 89
+   "stop_ms": 82
   },
   "a job dropped into the scheduler / WAKE": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 91
+   "stop_ms": 88
   },
   "a scheduled job that keeps running / kill the agent": {
    "planted": true,
@@ -173,19 +173,19 @@
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 3
+   "stop_ms": 6
   },
   "a scheduled job that keeps running / WAKE, processes only": {
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 86
+   "stop_ms": 88
   },
   "a scheduled job that keeps running / WAKE": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 90
+   "stop_ms": 86
   },
   "a copy of itself, started from elsewhere / kill the agent": {
    "planted": true,
@@ -203,19 +203,19 @@
    "planted": true,
    "came_back": true,
    "person_ok": true,
-   "stop_ms": 3
+   "stop_ms": 5
   },
   "a copy of itself, started from elsewhere / WAKE, processes only": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 89
+   "stop_ms": 95
   },
   "a copy of itself, started from elsewhere / WAKE": {
    "planted": true,
    "came_back": false,
    "person_ok": true,
-   "stop_ms": 85
+   "stop_ms": 93
   }
  },
  "machine": "aarch64",
