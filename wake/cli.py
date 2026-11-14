@@ -266,9 +266,13 @@ def cmd_sessions(_args):
 
 
 def cmd_view(args):
-    from .viewer import serve
     from .session import Session
-    serve(Session.find(args.session), args.port)
+    from .viewer import serve, stop
+    s = Session.find(args.session)
+    if args.stop:
+        say(f"stopped {stop(s)} viewer process(es) for session {s.id}.")
+        return
+    serve(s, args.port, open_browser=not args.no_browser, bind=args.bind)
 
 
 def main(argv=None):
@@ -307,6 +311,9 @@ def main(argv=None):
     a = sub.add_parser("view")
     a.add_argument("session", nargs="?")
     a.add_argument("--port", type=int, default=7700)
+    a.add_argument("--bind", default="127.0.0.1")
+    a.add_argument("--no-browser", action="store_true")
+    a.add_argument("--stop", action="store_true")
     args = p.parse_args(argv)
     {"stop": cmd_stop, "restore": cmd_restore, "whose": cmd_whose, "mine": cmd_mine, "kill-mine": cmd_kill_mine,
      "keep": cmd_keep, "report": cmd_report, "sessions": cmd_sessions, "view": cmd_view}[args.cmd](args)

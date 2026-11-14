@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WAKE · the agent's body</title>
+<style>
+:root{
+  --bg:#0c0e11; --panel:#13161b; --line:#232832; --text:#e8eaee; --muted:#8a93a3; --faint:#555d6b;
+  --agent:#ffab40; --agent-dim:#8a5a1c; --yours:#8fc2ff; --refused:#ff5d5d; --gone:#3a404b; --ok:#5fd39a;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+}
+@media (prefers-color-scheme: light){
+  :root{ --bg:#f6f6f3; --panel:#ffffff; --line:#e3e3de; --text:#14171c; --muted:#5d6573; --faint:#a3a8b0;
+         --agent:#d97706; --agent-dim:#f4c27f; --yours:#2563eb; --refused:#dc2626; --gone:#d4d6da; --ok:#15803d; }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+header{display:flex;align-items:center;gap:18px;padding:18px 28px;border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:.32em;font-size:15px}
+.sub{color:var(--muted);font-size:14px}
+.cmd{font-family:var(--mono);font-size:13px;color:var(--text);background:var(--panel);border:1px solid var(--line);
+     padding:5px 10px;border-radius:6px;max-width:44vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pill{margin-left:auto;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;
+      border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.pill.running{color:var(--agent);border-color:var(--agent-dim)}
+.pill.running::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--agent);
+      margin-right:8px;animation:pulse 1.4s infinite}
+.pill.stopped{color:var(--ok);border-color:var(--ok)}
+@keyframes pulse{50%{opacity:.25}}
+.laws{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.law{background:var(--bg);padding:14px 28px;font-size:15px;line-height:1.45}
+.law b{color:var(--agent);font-weight:600;margin-right:6px}
+.counters{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line)}
+.counter{padding:18px 28px;border-right:1px solid var(--line)}
+.counter:last-child{border-right:none}
+.counter .n{font-size:34px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.counter .l{color:var(--muted);font-size:13px;margin-top:2px}
+.counter.agent .n{color:var(--agent)} .counter.yours .n{color:var(--yours)} .counter.refused .n{color:var(--refused)}
+.counter.ok .n{color:var(--ok)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 380px;min-height:calc(100vh - 330px)}
+.stage{position:relative;border-right:1px solid var(--line);overflow:auto;padding:18px 10px 10px}
+.stage h2,.side h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:0 0 10px 18px}
+.side h2{margin-left:0}
+svg text{font-family:var(--mono);font-size:11px;fill:var(--muted)}
+svg .edge{stroke:var(--line);stroke-width:1.4;fill:none}
+svg .edge.live{stroke:var(--agent-dim)}
+svg .node circle{transition:fill .5s, stroke .5s, r .4s}
+svg .node.alive circle{fill:var(--agent);stroke:var(--agent)}
+svg .node.dead circle{fill:var(--bg);stroke:var(--gone);stroke-width:2}
+svg .node.adopted circle{fill:var(--yours);stroke:var(--yours)}
+svg .node.root circle{fill:var(--bg);stroke:var(--text);stroke-width:2}
+svg .node.fresh circle{animation:pop .6s ease-out}
+svg .yours circle{fill:var(--bg);stroke:var(--yours);stroke-width:2}
+svg .yours text{fill:var(--yours)}
+svg .tried{stroke:var(--refused);stroke-width:1.6;stroke-dasharray:5 4;fill:none}
+svg .x{stroke:var(--refused);stroke-width:2.2}
+svg .count{fill:var(--text);font-size:10px;font-weight:600}
+@keyframes pop{0%{r:0}60%{r:13}}
+.side{padding:18px 22px;overflow:auto}
+.list{list-style:none;margin:0 0 26px;padding:0}
+.list li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px}
+.list .how{color:var(--yours);font-weight:600;font-size:12px;letter-spacing:.02em}
+.list .how.refused{color:var(--refused)} .list .how.ev{color:var(--muted)}
+.list .what{font-family:var(--mono);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .back{color:var(--ok);font-size:11px;margin-left:6px}
+.empty{color:var(--faint);font-size:13px;margin:0 0 26px}
+footer{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:start;padding:16px 28px;border-top:1px solid var(--line)}
+footer .q{font-family:var(--mono);font-size:12px;color:var(--text);background:var(--panel);border:1px solid var(--line);
+          border-radius:8px;padding:10px 14px;white-space:pre;overflow:auto}
+footer .why{color:var(--muted);font-size:13px;line-height:1.5;max-width:520px}
+footer .why b{color:var(--text)}
+@media (max-width: 900px){
+  main{grid-template-columns:1fr} .stage{border-right:none;border-bottom:1px solid var(--line)}
+  .counters{grid-template-columns:repeat(2,1fr)} .laws{grid-template-columns:1fr} footer{grid-template-columns:1fr}
+  .cmd{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">WAKE</div>
+  <div class="sub">the agent's body, live</div>
+  <div class="cmd" id="cmd">…</div>
+  <div class="pill" id="status">connecting</div>
+</header>
+<section class="laws">
+  <div class="law"><b>1</b>An agent can only destroy what it made. Anything of yours it changes is kept first.</div>
+  <div class="law"><b>2</b>When you stop it, everything it made stops with it.</div>
+</section>
+<section class="counters">
+  <div class="counter agent"><div class="n" id="c-alive">0</div><div class="l">of its processes running</div></div>
+  <div class="counter"><div class="n" id="c-made">0</div><div class="l">files and folders it made</div></div>
+  <div class="counter yours"><div class="n" id="c-kept">0</div><div class="l">things of yours it touched, kept</div></div>
+  <div class="counter refused"><div class="n" id="c-refused">0</div><div class="l">reaches into your processes refused</div></div>
+  <div class="counter ok"><div class="n" id="c-stop">–</div><div class="l" id="c-stop-l">stopped in</div></div>
+</section>
+<main>
+  <div class="stage">
+    <h2>Everything it started, as the graph records it</h2>
+    <svg id="tree" width="600" height="300"></svg>
+  </div>
+  <aside class="side">
+    <h2>Yours, kept before it was touched</h2>
+    <ul class="list" id="kept"></ul>
+    <h2>Refused</h2>
+    <ul class="list" id="refused"></ul>
+    <h2>What happened</h2>
+    <ul class="list" id="events"></ul>
+  </aside>
+</main>
+<footer>
+  <div class="q" id="law-q">MATCH (p:Process)-[:MADE]-&gt;(f:File {key: $key})
+WHERE f.gone IS NULL AND f.adopted IS NULL
+RETURN p.key AS by LIMIT 1</div>
+  <div class="why">Before every delete, move or overwrite, WAKE asks the agent's body graph this question,
+    in the same process, in about 90 microseconds. If the answer is no, the thing is yours: WAKE keeps it,
+    then lets the call through. <br><b>Source:</b> <span id="source"></span></div>
+</footer>
+<script>
+/*WAKE_CONFIG*/
+const W = window.WAKE || {endpoint: "/query", source: "?"};
+document.getElementById("source").textContent = W.source;
+const Q = {
+  session: "MATCH (s:Session) RETURN s.id AS id, s.cmd AS cmd, s.status AS status, s.started AS started LIMIT 1",
+  procs: "MATCH (a)-[:SPAWNED]->(p:Process) RETURN p.key AS key, p.pid AS pid, p.cmd AS cmd, p.alive AS alive, p.adopted AS adopted, p.born AS born, CASE WHEN a:Session THEN null ELSE a.key END AS parent ORDER BY p.born LIMIT 600",
+  made: "MATCH (p:Process)-[:MADE]->(f:File) RETURN p.key AS key, count(f) AS made",
+  kept: "MATCH (k:Kept) RETURN k.path AS path, k.whys AS whys, k.restored AS restored, k.first AS first ORDER BY k.first DESC LIMIT 300",
+  tried: "MATCH (p:Process)-[t:TRIED]->(y:Process) RETURN p.key AS by, y.key AS key, y.pid AS pid, y.cmd AS cmd, t.detail AS what, t.at AS at ORDER BY t.at",
+  events: "MATCH (:Session)-[:LOGGED]->(e:Event) RETURN e.kind AS kind, e.detail AS detail, e.at AS at ORDER BY e.at DESC LIMIT 60"
+};
+async function ask(statement){
+  const r = await fetch(W.endpoint, {method:"POST", headers:{"Content-Type":"application/json","Accept":"application/json"},
+                                     body: JSON.stringify({statement})});
+  const j = await r.json();
+  if (!j.data) return [];
+  return j.data.values.map(v => Object.fromEntries(j.data.fields.map((f,i)=>[f, v[i]])));
+}
+const seen = new Set();
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const short = (s, n) => { s = String(s || ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+const hhmmss = t => t ? new Date(t * 1000).toLocaleTimeString([], {hour12:false}) : "";
+const HOW = {deleted:"deleted", overwritten:"wrote over", replaced:"replaced", moved:"moved"};
+
+function drawTree(procs, made, tried){
+  const svg = document.getElementById("tree");
+  const stage = svg.parentElement;
+  const byKey = new Map(procs.map(p => [p.key, {...p, kids: []}]));
+  const root = {key: "session", kids: [], root: true};
+  for (const p of byKey.values()) (p.parent && byKey.get(p.parent) ? byKey.get(p.parent).kids : root.kids).push(p);
+  const triedBy = new Set(tried.map(t => t.by));
+  // fold finished one-off commands (no files, no children, reached for nothing) into one node per parent
+  (function fold(n){
+    n.kids.forEach(fold);
+    const keep = [], done = [];
+    for (const k of n.kids) (k.alive || k.adopted || made.get(k.key) || k.kids.length || triedBy.has(k.key) ? keep : done).push(k);
+    n.kids = keep;
+    if (done.length) n.kids.push({key: n.key + ":done", ghost: true, count: done.length, kids: [], cmds: done.map(d => d.cmd)});
+  })(root);
+  let leaf = 0, maxDepth = 0;
+  (function lay(n, d){
+    n.depth = d; maxDepth = Math.max(maxDepth, d);
+    if (!n.kids.length){ n.x = leaf++; return; }
+    n.kids.forEach(k => lay(k, d + 1));
+    n.x = (n.kids[0].x + n.kids[n.kids.length - 1].x) / 2;
+  })(root, 0);
+  const yours = [...new Map(tried.map(t => [t.key, t])).values()];
+  const PAD = 80, YW = yours.length ? 250 : 0;
+  const avail = Math.max(stage.clientWidth - 2 * PAD - YW, 200);
+  const DX = Math.max(26, Math.min(130, avail / Math.max(leaf - 1, 1))), DY = 78;
+  const treeW = PAD + Math.max(leaf - 1, 0) * DX;
+  const w = Math.max(treeW + PAD + YW, stage.clientWidth - 20);
+  const h = Math.max((maxDepth + 1) * DY + PAD + 40, yours.length * 70 + PAD + 40, 260);
+  svg.setAttribute("width", w); svg.setAttribute("height", h);
+  const px = n => PAD + n.x * DX, py = n => PAD + n.depth * DY;
+  const chars = Math.max(6, Math.floor(DX / 6.8));
+  let out = "";
+  const nodes = [];
+  (function walk(n){ nodes.push(n); n.kids.forEach(k => { out += `<path class="edge ${k.alive ? "live" : ""}" d="M${px(n)},${py(n)} C${px(n)},${py(n)+DY*0.55} ${px(k)},${py(k)-DY*0.55} ${px(k)},${py(k)}"/>`; walk(k); }); })(root);
+  const pos = new Map(nodes.map(n => [n.key, [px(n), py(n)]]));
+  const YX = w - YW + 36;
+  yours.forEach((y, i) => {
+    const yy = PAD + 10 + i * 70;
+    for (const t of tried.filter(t => t.key === y.key)){
+      const [bx, by] = pos.get(t.by) || [px(root), py(root)];
+      out += `<path class="tried" d="M${bx},${by} C${(bx+YX)/2},${by} ${(bx+YX)/2},${yy} ${YX-14},${yy}"/>`;
+      const mx = bx + (YX - bx) * 0.55, my = by + (yy - by) * 0.5;
+      out += `<line class="x" x1="${mx-6}" y1="${my-6}" x2="${mx+6}" y2="${my+6}"/><line class="x" x1="${mx-6}" y1="${my+6}" x2="${mx+6}" y2="${my-6}"/>`;
+    }
+    out += `<g class="yours"><circle cx="${YX}" cy="${yy}" r="9"/><text x="${YX+16}" y="${yy-2}">yours · ${esc(y.pid)}</text><text x="${YX+16}" y="${yy+12}">${esc(short(y.cmd, 30))}</text><title>${esc(y.cmd)}</title></g>`;
+  });
+  for (const n of nodes){
+    if (n.ghost){
+      out += `<g class="node dead"><circle cx="${px(n)}" cy="${py(n)}" r="5" style="stroke-dasharray:2 2"/>` +
+             `<text x="${px(n)}" y="${py(n)+20}" text-anchor="middle">+${n.count} finished</text><title>${esc(n.cmds.slice(0, 12).join("\n"))}</title></g>`;
+      continue;
+    }
+    const cls = n.root ? "root" : n.adopted ? "adopted" : n.alive ? "alive" : "dead";
+    const fresh = !n.root && !seen.has(n.key) ? " fresh" : "";
+    if (!n.root) seen.add(n.key);
+    const m = made.get(n.key) || 0;
+    const r = n.root ? 9 : Math.min(6 + Math.sqrt(m) * 1.1, 15);
+    const label = n.root ? "WAKE session" : `${n.pid} ${(n.cmd || "").split(" ").slice(0, 3).join(" ")}`;
+    out += `<g class="node ${cls}${fresh}"><circle cx="${px(n)}" cy="${py(n)}" r="${r}"/>` +
+           (m ? `<text class="count" x="${px(n)+r+3}" y="${py(n)-r+2}">${m}</text>` : "") +
+           `<text x="${px(n)}" y="${py(n)+r+14}" text-anchor="middle">${esc(short(label, n.root ? 20 : chars))}</text><title>${esc(n.cmd || "")}${m ? `\n${m} files made` : ""}</title></g>`;
+  }
+  svg.innerHTML = out;
+}
+
+function commonDir(paths){
+  if (!paths.length) return "";
+  let pre = paths[0].split("/").slice(0, -1);
+  for (const p of paths){ const q = p.split("/"); let i = 0; while (i < pre.length && pre[i] === q[i]) i++; pre = pre.slice(0, i); }
+  return pre.join("/");
+}
+
+function list(id, items, empty){
+  const el = document.getElementById(id);
+  if (!items.length){ el.outerHTML = `<p class="empty" id="${id}">${empty}</p>`; return; }
+  if (el.tagName !== "UL"){ const ul = document.createElement("ul"); ul.className = "list"; ul.id = id; el.replaceWith(ul); }
+  document.getElementById(id).innerHTML = items.join("");
+}
+
+async function tick(){
+  try {
+    const [s, procs, madeRows, kept, tried, events] = await Promise.all(
+      [Q.session, Q.procs, Q.made, Q.kept, Q.tried, Q.events].map(ask));
+    const sess = s[0] || {};
+    document.getElementById("cmd").textContent = sess.cmd || "";
+    const st = document.getElementById("status");
+    const running = sess.status === "running" || (!sess.status && procs.some(p => p.alive));
+    st.textContent = running ? "running" : (sess.status || "waiting");
+    st.className = "pill " + (running ? "running" : (sess.status === "stopped" || sess.status === "finished") ? "stopped" : "");
+    const made = new Map(madeRows.map(r => [r.key, r.made]));
+    document.getElementById("c-alive").textContent = procs.filter(p => p.alive && !p.adopted).length;
+    document.getElementById("c-made").textContent = madeRows.reduce((a, r) => a + r.made, 0);
+    document.getElementById("c-kept").textContent = kept.length;
+    const narrowed = events.filter(e => e.kind === "narrowed" || e.kind === "refused").length;
+    document.getElementById("c-refused").textContent = tried.length + narrowed;
+    const stop = events.find(e => e.kind === "stopped");
+    if (stop){ try { const d = JSON.parse(stop.detail); document.getElementById("c-stop").textContent = d.ms != null ? `${d.ms} ms` : "done"; } catch(e){} }
+    drawTree(procs, made, tried);
+    const base = commonDir(kept.map(k => k.path));
+    const rel = p => base && p.startsWith(base + "/") ? "…/" + p.slice(base.length + 1) : p;
+    const more = kept.length > 10 ? [`<li><span class="how ev"></span><span class="what">and ${kept.length - 10} more, all kept</span></li>`] : [];
+    list("kept", kept.slice(0, 10).map(k => `<li><span class="how">${esc([...new Set((k.whys||[]).map(w => HOW[w] || w))].join(", "))}</span><span class="what" title="${esc(k.path)}">${esc(rel(k.path))}${k.restored ? '<span class="back">put back</span>' : ""}</span></li>`).concat(more),
+         "Nothing of yours has been touched.");
+    list("refused", tried.map(t => `<li><span class="how refused">${esc(t.what)}</span><span class="what" title="${esc(t.cmd)}">to ${esc(t.pid)} ${esc(short(t.cmd, 40))}</span></li>`)
+         .concat(events.filter(e => e.kind === "narrowed" || e.kind === "refused").map(e => `<li><span class="how refused">${e.kind === "narrowed" ? "narrowed" : "refused"}</span><span class="what" title="${esc(e.detail)}">${esc(e.detail)}</span></li>`)),
+         "Nothing has reached for your processes.");
+    list("events", events.filter(e => e.kind !== "narrowed" && e.kind !== "refused").slice(0, 20).map(e => {
+      let d = e.detail;
+      if (e.kind === "stopped" || e.kind === "finished"){ try { const j = JSON.parse(d);
+        d = `${j.reason || "finished"}${j.removed_triggers && j.removed_triggers.length ? `; removed ${j.removed_triggers.length} planted file(s)` : ""}${j.restored_triggers && j.restored_triggers.length ? `; put back ${j.restored_triggers.length} start-up file(s)` : ""}${j.swept && j.swept.length ? `; stopped ${j.swept.length} running its code` : ""}`; } catch(x){} }
+      return `<li><span class="how ev">${esc(hhmmss(e.at))} ${esc(e.kind)}</span><span class="what" title="${esc(d)}">${esc(d)}</span></li>`; }),
+      "Nothing yet.");
+  } catch (e) {
+    const st = document.getElementById("status"); st.textContent = "no connection"; st.className = "pill";
+  }
+}
+tick(); setInterval(tick, 500);
+</script>
+</body>
+</html>
