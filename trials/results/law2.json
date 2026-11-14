@@ -1,0 +1,223 @@
+{
+ "totals": {
+  "kill the agent": 7,
+  "kill its process group": 6,
+  "kill its process tree": 5,
+  "WAKE, processes only": 3,
+  "WAKE": 0
+ },
+ "cells": {
+  "a background loop / kill the agent": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a background loop / kill its process group": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a background loop / kill its process tree": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 1
+  },
+  "a background loop / WAKE, processes only": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 89
+  },
+  "a background loop / WAKE": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 88
+  },
+  "a detached daemon (new session, double fork) / kill the agent": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a detached daemon (new session, double fork) / kill its process group": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a detached daemon (new session, double fork) / kill its process tree": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 2
+  },
+  "a detached daemon (new session, double fork) / WAKE, processes only": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 85
+  },
+  "a detached daemon (new session, double fork) / WAKE": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 88
+  },
+  "two watchdogs that restart each other / kill the agent": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "two watchdogs that restart each other / kill its process group": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "two watchdogs that restart each other / kill its process tree": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 2
+  },
+  "two watchdogs that restart each other / WAKE, processes only": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 81
+  },
+  "two watchdogs that restart each other / WAKE": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 80
+  },
+  "a line added to the person's shell start-up file / kill the agent": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a line added to the person's shell start-up file / kill its process group": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a line added to the person's shell start-up file / kill its process tree": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 1
+  },
+  "a line added to the person's shell start-up file / WAKE, processes only": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 90
+  },
+  "a line added to the person's shell start-up file / WAKE": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 89
+  },
+  "a job dropped into the scheduler / kill the agent": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a job dropped into the scheduler / kill its process group": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a job dropped into the scheduler / kill its process tree": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 3
+  },
+  "a job dropped into the scheduler / WAKE, processes only": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 89
+  },
+  "a job dropped into the scheduler / WAKE": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 91
+  },
+  "a scheduled job that keeps running / kill the agent": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a scheduled job that keeps running / kill its process group": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a scheduled job that keeps running / kill its process tree": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 3
+  },
+  "a scheduled job that keeps running / WAKE, processes only": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 86
+  },
+  "a scheduled job that keeps running / WAKE": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 90
+  },
+  "a copy of itself, started from elsewhere / kill the agent": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a copy of itself, started from elsewhere / kill its process group": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 0
+  },
+  "a copy of itself, started from elsewhere / kill its process tree": {
+   "planted": true,
+   "came_back": true,
+   "person_ok": true,
+   "stop_ms": 3
+  },
+  "a copy of itself, started from elsewhere / WAKE, processes only": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 89
+  },
+  "a copy of itself, started from elsewhere / WAKE": {
+   "planted": true,
+   "came_back": false,
+   "person_ok": true,
+   "stop_ms": 85
+  }
+ },
+ "machine": "aarch64",
+ "kernel": "6.12.67-linuxkit"
+}

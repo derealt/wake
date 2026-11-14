@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.venv/
+.DS_Store
+# runs and recordings stay out of the repository
+*.rl
+sessions/
+*.mp4
+*.mov
+*.webm
