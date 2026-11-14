@@ -10,6 +10,8 @@ WAKE: the agent's body. Before any call that could destroy something, WAKE asks 
 *did the agent make this?* If it did, the call goes through. If it did not, the thing is yours: WAKE keeps it
 first, or refuses the call outright if it is one of your running processes.
 
+![The live view after a stop: nothing of the agent left running, 71 of the person's things kept and put back, its reaches into the person's processes refused](docs/img/wake-view.jpg)
+
 When you stop the agent, WAKE walks the same graph and stops all of it: every process it started, however far
 it has wandered from its parent, every file it planted to run again later, and anything still running its code.
 
