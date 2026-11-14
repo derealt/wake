@@ -150,8 +150,9 @@ that happens to reuse an inode number is not the agent's. A process is known by 
 - **It sits on the system-call path.** WAKE asks the graph on every destructive call. Relate runs inside the
   supervisor's own process and answers the ownership query in about 90 microseconds; a database across a socket
   could not sit there.
-- **One graph per run, in one place.** Each session is its own store. The store is the whole record of what an
-  agent did to a machine, and you can query it afterwards in Cypher.
+- **One graph per run, in one place.** Each session is its own store: the whole record of what an agent did to a
+  machine. `wake export` packs it into a single `.rl` file with Relate's own `clone`; anyone can open it later with
+  `relate -d run.rl --read-only` and ask it questions in Cypher.
 - **Follow mode.** `relate serve --read-only=live` follows the store while WAKE writes it. That is how
   `wake view` shows the agent's body in your browser as it changes, straight from Relate's HTTP Query API.
 - **Paths are first-class.** Lineage (`-[:SPAWNED]->+`), adoption that cuts a branch off, the explanation behind
@@ -189,6 +190,7 @@ without it the page still works from WAKE's own read-only queries.
 | `wake keep PATH` or `PID` | make something the agent made yours: it can no longer destroy it, and a stop leaves it running |
 | `wake view` | the agent's body, live in the browser |
 | `wake report` | what happened in a run |
+| `wake export` | the whole run as one Relate file (`relate clone`), to keep, share or query later |
 | `wake mine` | for the agent: what it has made and what is still running |
 | `wake kill-mine PATTERN` | for the agent: stop only its own processes that match |
 

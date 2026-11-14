@@ -57,7 +57,7 @@ file `major:minor:inode:birth`. `adopted` on Process and File marks things the p
 
 `wake run [--keep-running] [--no-triggers] [--no-sweep] [--quiet] -- CMD`, `wake stop [SESSION]`,
 `wake restore [PATH...] [--dry-run] [--force]`, `wake whose PATH|PID`, `wake keep PATH|PID`, `wake view [--bind]
-[--stop]`, `wake report [--json]`, `wake mine`, `wake kill-mine PATTERN`, `wake sessions`.
+[--stop]`, `wake report [--json]`, `wake export [--out FILE]`, `wake mine`, `wake kill-mine PATTERN`, `wake sessions`.
 `wake run` exits with the agent's exit code.
 
 ## 7. Conventions
@@ -91,6 +91,7 @@ file `major:minor:inode:birth`. `adopted` on Process and File marks things the p
   and the agent as uid 10001; never run them on a machine you care about.
 - `WAKE_HOME` (default `~/.local/state/wake`) holds sessions; the agent can never write there.
 - `RELATE_DURABILITY_MODE=everysecond` is set by `body.py` unless already set.
+- Every call to the `relate` command line runs with `DO_NOT_TRACK=1` and `RELATE_TELEMETRY=0` (`viewer.quiet_env`).
 
 ## The expedition
 

@@ -14,6 +14,7 @@ wake mine                            what the agent has made (for the agent itse
 wake kill-mine PATTERN               stop only the agent's own processes that match
 wake keep PATH|PID                   make something the agent made yours
 wake report [SESSION]                what happened in a run
+wake export [SESSION] [--out FILE]   the whole run as one Relate file
 wake view [SESSION]                  watch the agent's body live in the browser
 wake sessions                        list runs"""
 
@@ -258,6 +259,27 @@ def cmd_report(args):
         print_summary(meta["summary"])
 
 
+def cmd_export(args):
+    """One file per run: Relate's own single-file bundle of the body graph, made with `relate clone`."""
+    import shutil
+    import subprocess
+    from .session import Session
+    s = Session.find(args.session)
+    if s.supervisor_alive():
+        raise SystemExit("wake: the agent is still running. Export it after `wake stop`.")
+    out = os.path.abspath(args.out or f"wake-{s.id}.rl")
+    relate = shutil.which("relate")
+    if not relate:
+        raise SystemExit("wake: export needs the `relate` command (curl -sSfL https://relatedb.ai/install.sh | bash)")
+    if os.path.exists(out):
+        raise SystemExit(f"wake: {out} already exists; choose another name")
+    from .viewer import quiet_env
+    r = subprocess.run([relate, "clone", s.store, out], capture_output=True, text=True, env=quiet_env())
+    if r.returncode != 0:
+        raise SystemExit(f"wake: relate clone failed: {r.stderr.strip()[:300]}")
+    say(f"the whole run is in {out}. Query it: relate -d {out} --read-only \"MATCH (k:Kept) RETURN k.path, k.whys\"")
+
+
 def cmd_sessions(_args):
     from .session import Session
     for sid in Session.all():
@@ -308,6 +330,9 @@ def main(argv=None):
     a.add_argument("session", nargs="?")
     a.add_argument("--json", action="store_true")
     sub.add_parser("sessions")
+    a = sub.add_parser("export")
+    a.add_argument("session", nargs="?")
+    a.add_argument("--out")
     a = sub.add_parser("view")
     a.add_argument("session", nargs="?")
     a.add_argument("--port", type=int, default=7700)
@@ -316,7 +341,8 @@ def main(argv=None):
     a.add_argument("--stop", action="store_true")
     args = p.parse_args(argv)
     {"stop": cmd_stop, "restore": cmd_restore, "whose": cmd_whose, "mine": cmd_mine, "kill-mine": cmd_kill_mine,
-     "keep": cmd_keep, "report": cmd_report, "sessions": cmd_sessions, "view": cmd_view}[args.cmd](args)
+     "keep": cmd_keep, "report": cmd_report, "sessions": cmd_sessions, "view": cmd_view,
+     "export": cmd_export}[args.cmd](args)
 
 
 def entry():

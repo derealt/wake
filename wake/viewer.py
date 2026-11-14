@@ -16,6 +16,11 @@ import time
 from importlib import resources
 
 
+def quiet_env():
+    """Run Relate's command line with its anonymous usage reporting switched off."""
+    return dict(os.environ, DO_NOT_TRACK="1", RELATE_TELEMETRY="0")
+
+
 def _port_open(port):
     with socket.socket() as s:
         s.settimeout(0.2)
@@ -48,7 +53,7 @@ def serve(session, port=7700, open_browser=True, bind="127.0.0.1"):
     if relate_bin and os.path.isdir(session.store):
         proc = subprocess.Popen([relate_bin, "serve", "--database", session.store, "--read-only=live",
                                  "--http", str(rport), "--auth", "none"] + (["--host", bind] if bind != "127.0.0.1" else []),
-                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=quiet_env())
         for _ in range(50):
             if _port_open(rport):
                 endpoint = f"http://127.0.0.1:{rport}/db/neo4j/query/v2"
