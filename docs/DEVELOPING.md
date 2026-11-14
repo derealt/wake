@@ -1,4 +1,4 @@
-# WAKE
+# Developing WAKE
 
 ## 1. Purpose
 
