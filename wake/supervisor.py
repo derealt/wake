@@ -95,6 +95,7 @@ class Supervisor:
         self.adopted = set()               # tgids you adopted: left running, no longer checked
         self.on_stopped = None             # callback(summary) for the command line
         self.counts = Counter()
+        self.dirs = {}                     # directory path -> (its identity, its real path)
         self.log = open(session.events, "a", buffering=1)
         self.handlers = {}
         for n in ("open", "creat", "openat", "openat2"):
@@ -155,6 +156,7 @@ class Supervisor:
             if self.stop_asked and not self.stopping:
                 self.begin_stop(self.stop_asked)
             busy = self.reap()
+            self.body.tick()
             if self.stopping and self.stop_done is None and not self.unadopted():
                 self.complete_stop()
             if not self.tracees:
@@ -181,7 +183,9 @@ class Supervisor:
         return summary
 
     def reap(self):
-        busy = False
+        """Handle every stop that is ready. After a stop, poll briefly before sleeping:
+        the agent usually reaches its next checked call within microseconds."""
+        busy, idle = False, 0
         while True:
             try:
                 tid, status = os.waitpid(-1, os.WNOHANG | WALL)
@@ -189,8 +193,11 @@ class Supervisor:
                 self.tracees.clear()
                 return busy
             if tid == 0:
-                return busy
-            busy = True
+                if not busy or idle >= 200:
+                    return busy
+                idle += 1
+                continue
+            busy, idle = True, 0
             self.handle(tid, status)
 
     def handle(self, tid, status):
@@ -356,8 +363,21 @@ class Supervisor:
         head, tail = os.path.split(p)
         if tail in ("", ".", ".."):
             return os.path.realpath(p)
-        full = os.path.join(os.path.realpath(head), tail)
+        full = os.path.join(self.real_dir(head), tail)
         return os.path.realpath(full) if follow else full
+
+    def real_dir(self, head):
+        """realpath() of a directory, remembered and re-checked against the directory's identity."""
+        t = identity(head, follow=True)
+        hit = self.dirs.get(head)
+        if hit and t and hit[0] == t.key:
+            return hit[1]
+        real = os.path.realpath(head)
+        if t:
+            if len(self.dirs) > 20000:
+                self.dirs.clear()
+            self.dirs[head] = (t.key, real)
+        return real
 
     def protected(self, path):
         return path.startswith(self.protect) or path + "/" == self.protect
@@ -421,11 +441,13 @@ class Supervisor:
         if self.body.mine_file(t.key):
             self.counts["own_destroyed"] += 1
             if isdir or t.nlink <= 1:
-                self.pending[tid] = ("gone", t.key)
-                return SYSCALL
+                self.body.gone(t.key)        # if the call fails the file stays and is treated as yours: safe
+            if isdir:
+                self.dirs.clear()
             return CONT
         if isdir or stat.S_ISDIR(t.mode):
             self.keep_dir(me, path, t, "deleted")
+            self.dirs.clear()
         else:
             self.keep(me, path, t, "deleted")
         return CONT
@@ -462,6 +484,8 @@ class Supervisor:
             self.note_move(me, old, o)
         if exchange and n is not None and not n_mine:
             self.note_move(me, new, n)
+        if stat.S_ISDIR(o.mode) or stat.S_ISLNK(o.mode) or (n is not None and stat.S_ISDIR(n.mode)):
+            self.dirs.clear()
         self.pending[tid] = ("moved", o.key, o_mine, new, old, n.key if (exchange and n) else None, n_mine,
                              replaced_own)
         return SYSCALL

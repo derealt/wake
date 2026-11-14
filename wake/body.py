@@ -62,9 +62,19 @@ def now():
 
 
 class Body:
+    """Writes that happen thousands of times a second (made, gone, renamed, died) wait in a short queue
+    and land together in one UNWIND, at most 25 ms later. Reads look at the queue before the graph,
+    so a decision never misses a write that is still on its way."""
+
+    FLUSH_EVERY = 0.025
+    FLUSH_AT = 400
+
     def __init__(self, path, session_id, read_only=False, meta=None):
         self.path = path
         self.sid = session_id
+        self.queue = {"made": {}, "gone": {}, "renamed": {}, "died": {}}
+        self.queued = 0
+        self.last_flush = time.monotonic()
         self.db = relate.connect(path, read_only=read_only)
         if not read_only:
             for s in SCHEMA:
@@ -75,8 +85,41 @@ class Body:
     def q(self, s, p=None):
         return self.db.execute(s, p or {}).fetchall()
 
+    # ------------------------------------------------------------ the write queue
+    def _enqueue(self, kind, key, value):
+        self.queue[kind][key] = value
+        self.queued += 1
+        if self.queued >= self.FLUSH_AT:
+            self.flush()
+
+    def tick(self):
+        if self.queued and time.monotonic() - self.last_flush >= self.FLUSH_EVERY:
+            self.flush()
+
+    def flush(self):
+        q = self.queue
+        if q["made"]:
+            self.q("""UNWIND $rows AS r
+                      MATCH (p:Process {key: r.p})
+                      CREATE (p)-[:MADE {at: r.t}]->(:File {key: r.k, path: r.path, kind: r.kind, born: r.t,
+                                                            adopted: p.adopted})""",
+                   {"rows": list(q["made"].values())})
+        if q["renamed"]:
+            self.q("UNWIND $rows AS r MATCH (f:File {key: r.k}) SET f.path = r.path",
+                   {"rows": list(q["renamed"].values())})
+        if q["gone"]:
+            self.q("UNWIND $rows AS r MATCH (f:File {key: r.k}) SET f.gone = r.t", {"rows": list(q["gone"].values())})
+        if q["died"]:
+            self.q("UNWIND $rows AS r MATCH (p:Process {key: r.k}) SET p.alive = false, p.died = r.t",
+                   {"rows": list(q["died"].values())})
+        self.queue = {"made": {}, "gone": {}, "renamed": {}, "died": {}}
+        self.queued = 0
+        self.last_flush = time.monotonic()
+
     def close(self):
         try:
+            if self.queued:
+                self.flush()
             self.db.close()
         except Exception:
             pass
@@ -89,32 +132,35 @@ class Body:
                {"sid": self.sid, "key": key, "pid": pid, "cmd": cmd, "cwd": cwd, "t": now()})
 
     def child(self, parent_key, key, pid):
+        if self.queued:
+            self.flush()
+        # called once per process (the supervisor guarantees it), so CREATE: no scan of the parent's edges
         self.q("""MATCH (a:Process {key: $a})
-                  MERGE (p:Process {key: $key})
-                  ON CREATE SET p.pid = $pid, p.born = $t, p.alive = true, p.cmd = a.cmd, p.adopted = a.adopted
-                  MERGE (a)-[:SPAWNED {at: $t}]->(p)""",
+                  CREATE (a)-[:SPAWNED {at: $t}]->(:Process {key: $key, pid: $pid, born: $t, alive: true,
+                                                            cmd: a.cmd, adopted: a.adopted})""",
                {"a": parent_key, "key": key, "pid": pid, "t": now()})
 
     def executed(self, key, cmd, exe):
+        if self.queued:
+            self.flush()
         self.q("MATCH (p:Process {key: $key}) SET p.cmd = $cmd, p.exe = $exe", {"key": key, "cmd": cmd, "exe": exe})
 
     def died(self, key):
-        self.q("MATCH (p:Process {key: $key}) SET p.alive = false, p.died = $t", {"key": key, "t": now()})
+        self._enqueue("died", key, {"k": key, "t": now()})
 
     def made(self, pkey, fkey, path, kind):
-        self.q("""MATCH (p:Process {key: $p})
-                  MERGE (f:File {key: $k})
-                  ON CREATE SET f.path = $path, f.kind = $kind, f.born = $t, f.adopted = p.adopted
-                  MERGE (p)-[:MADE {at: $t}]->(f)""",
-               {"p": pkey, "k": fkey, "path": path, "kind": kind, "t": now()})
+        self.queue["gone"].pop(fkey, None)
+        self._enqueue("made", fkey, {"p": pkey, "k": fkey, "path": path, "kind": kind, "t": now()})
 
     def gone(self, fkey):
-        self.q("MATCH (f:File {key: $k}) SET f.gone = $t", {"k": fkey, "t": now()})
+        self._enqueue("gone", fkey, {"k": fkey, "t": now()})
 
     def renamed(self, fkey, path):
-        self.q("MATCH (f:File {key: $k}) SET f.path = $p", {"k": fkey, "p": path})
+        self._enqueue("renamed", fkey, {"k": fkey, "path": path})
 
     def kept(self, pkey, fkey, path, kind, how, store, store_kind, size, mode):
+        if self.queued:
+            self.flush()
         self.q("""MATCH (p:Process {key: $p})
                   MERGE (k:Kept {key: $k})
                   ON CREATE SET k.path = $path, k.kind = $kind, k.first = $t, k.store = $store,
@@ -137,6 +183,8 @@ class Body:
         self.q("MATCH (k:Kept {key: $k}) SET k.now = $p", {"k": fkey, "p": path})
 
     def tried(self, pkey, call, target_key, target_pid, target_cmd, detail):
+        if self.queued:
+            self.flush()
         self.q("""MATCH (p:Process {key: $p})
                   MERGE (y:Process {key: $tk})
                   ON CREATE SET y.pid = $tp, y.cmd = $tc, y.yours = true
@@ -150,9 +198,13 @@ class Body:
                {"sid": self.sid, "kind": kind, "d": detail, "t": now(), "p": pkey})
 
     def adopt_file(self, fkey):
+        if self.queued:
+            self.flush()
         self.q("MATCH (f:File {key: $k}) SET f.adopted = $t", {"k": fkey, "t": now()})
 
     def adopt_process(self, pkey):
+        if self.queued:
+            self.flush()
         t = now()
         self.q("""MATCH (a:Process {key: $k})-[:SPAWNED]->*(d:Process) SET d.adopted = $t""", {"k": pkey, "t": t})
         self.q("""MATCH (a:Process {key: $k})-[:SPAWNED]->*(d:Process)-[:MADE]->(f:File)
@@ -166,20 +218,28 @@ class Body:
 
     # ------------------------------------------------------------ reads (the laws)
     def mine_file(self, fkey):
+        if fkey in self.queue["gone"]:
+            return False
+        if fkey in self.queue["made"]:
+            return True
         return bool(self.q(MINE_FILE, {"key": fkey}))
 
     def mine_process(self, pkey):
+        self.flush()
         return bool(self.q(MINE_PROCESS, {"key": pkey}))
 
     def alive(self):
+        self.flush()
         return self.q(BODY_ALIVE)
 
     def made_live_files(self):
+        self.flush()
         return self.q("""MATCH (p:Process)-[:MADE]->(f:File)
                          WHERE f.gone IS NULL
                          RETURN f.key AS key, f.path AS path, f.kind AS kind, f.adopted AS adopted, p.cmd AS by""")
 
     def kept_all(self):
+        self.flush()
         return self.q("""MATCH (k:Kept)
                          RETURN k.key AS key, k.path AS path, k.now AS now, k.kind AS kind, k.whys AS whys,
                                 k.store AS store, k.store_kind AS sk, k.mode AS mode, k.size AS size,
@@ -187,6 +247,7 @@ class Body:
                          ORDER BY size(k.path), k.path""")
 
     def counts(self):
+        self.flush()
         r = self.q("""MATCH (s:Session {id: $sid})
                       OPTIONAL MATCH (s)-[:SPAWNED]->+(p:Process)
                       WITH s, count(DISTINCT p) AS processes

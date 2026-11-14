@@ -1,0 +1,57 @@
+{
+ "rows": [
+  {
+   "work": "write 20,000 small files",
+   "alone_s": 0.715,
+   "wake_s": 2.308,
+   "extra_s": 1.592
+  },
+  {
+   "work": "unpack a 2,000-file archive",
+   "alone_s": 0.013,
+   "wake_s": 0.164,
+   "extra_s": 0.151
+  },
+  {
+   "work": "compile 600 Python modules",
+   "alone_s": 0.146,
+   "wake_s": 0.289,
+   "extra_s": 0.143
+  },
+  {
+   "work": "clone a 2,000-file git repository",
+   "alone_s": 0.032,
+   "wake_s": 0.188,
+   "extra_s": 0.157
+  },
+  {
+   "work": "run a test suite",
+   "alone_s": 0.045,
+   "wake_s": 0.103,
+   "extra_s": 0.059
+  },
+  {
+   "work": "delete all of it again (rm -rf)",
+   "alone_s": 0.081,
+   "wake_s": 2.722,
+   "extra_s": 2.642
+  },
+  {
+   "work": "delete 2,000 of the person's files",
+   "alone_s": 0.007,
+   "wake_s": 0.669,
+   "extra_s": 0.662
+  },
+  {
+   "work": "rewrite 300 of the person's files",
+   "alone_s": 0.003,
+   "wake_s": 0.113,
+   "extra_s": 0.11
+  }
+ ],
+ "startup_s": 0.049,
+ "machine": "aarch64",
+ "kernel": "6.12.67-linuxkit",
+ "runs": 3,
+ "statistic": "median"
+}
