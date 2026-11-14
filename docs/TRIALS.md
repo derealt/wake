@@ -2,7 +2,7 @@
 
 Everything here runs inside a Linux container as root, and plays the person and the agent as an ordinary user
 (uid 10001), so a trial can destroy the person's world without touching the machine it runs on. With the Docker
-image: `docker run --rm -it wake trials`.
+image: `docker run --rm -it --init wake trials`.
 
 ## Law 1: a person's world against destructive commands (`trials/law1.py`)
 
@@ -53,9 +53,10 @@ Medians of three runs, Linux 6.12 on aarch64 (Docker on Apple Silicon). The agen
 
 ## Tests (`tests/`)
 
-20 tests: the kernel filter's verdicts on aarch64 and x86_64 (checked by a small BPF interpreter, no kernel
+22 tests: the kernel filter's verdicts on aarch64 and x86_64 (checked by a small BPF interpreter, no kernel
 needed), and both laws on a real kernel: deletes, overwrites, moves, moved folders, rename collisions, hard links,
-symlinks, adoption, WAKE's own records, identity across inode reuse, refused and narrowed signals, the stop.
+symlinks, adoption, WAKE's own records, identity across inode reuse, refused and narrowed signals, the stop,
+two agents on one machine, and a Node.js agent (async file work on libuv's thread pool, a detached child, a kill).
 
 **Each guard was broken on purpose, and the suite went red:**
 

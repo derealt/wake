@@ -13,7 +13,7 @@ keywords = ["ai-agents", "safety", "relate", "graph", "neo4j", "kill-switch"]
 classifiers = ["Operating System :: POSIX :: Linux", "Programming Language :: Python :: 3"]
 
 [project.scripts]
-wake = "wake.cli:main"
+wake = "wake.cli:entry"
 
 [tool.setuptools.packages.find]
 include = ["wake*"]

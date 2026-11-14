@@ -1,8 +1,8 @@
 # WAKE: the one-command demo and the trials, on any machine that runs Docker.
 #   docker build -t wake .
-#   docker run --rm -it -p 127.0.0.1:7700-7701:7700-7701 wake demo     # the demo and the live view
-#   docker run --rm -it wake trials                                     # tests and trials
-#   docker run --rm -it wake shell                                      # a shell as the person, with `wake`
+#   docker run --rm -it --init -p 127.0.0.1:7700-7701:7700-7701 wake demo     # the demo and the live view
+#   docker run --rm -it --init wake trials                                     # tests and trials
+#   docker run --rm -it --init wake shell                                      # a shell as the person, with `wake`
 FROM python:3.12-slim
 
 RUN apt-get update \

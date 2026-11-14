@@ -2,7 +2,9 @@
 
 **An AI agent can only destroy what it made. When you stop it, everything it made stops with it.**
 
-WAKE runs an AI agent (Claude Code, Codex, Gemini CLI, Aider, your own) on your real machine, not in a copy.
+WAKE runs an AI agent on your real machine, not in a copy. Any agent that is a program on Linux works: Claude Code
+and Gemini CLI (Node.js), Aider (Python), Codex (a native binary), your own. The test suite runs shell, Python and
+Node.js agents.
 Every process the agent starts and every file it makes is recorded, as it happens, in a graph that lives inside
 WAKE: the agent's body. Before any call that could destroy something, WAKE asks that graph one question:
 *did the agent make this?* If it did, the call goes through. If it did not, the thing is yours: WAKE keeps it
@@ -69,6 +71,10 @@ run again?
 `trials/law2.py` runs the whole table. Even the strongest ordinary stop, killing every process in the current
 tree, misses what has left the tree. WAKE does not look at the tree as it is now. It looks at the graph of
 everything the agent ever started.
+
+**Two agents on one machine.** Each agent runs in its own session with its own graph, so to agent B, everything
+agent A made is "yours". When B ran `pkill -f` on A's server and `rm -rf` on A's work, the kills were refused and
+A's files were kept; restoring B's session put them back (`tests/test_laws.py`).
 
 **What it costs.** The kernel stops the agent only on calls that could destroy something; reads, writes to open
 files, network and computation run at full speed. Medians of three runs, Linux 6.12 on aarch64 (Docker on Apple Silicon):
@@ -154,7 +160,7 @@ that happens to reuse an inode number is not the agent's. A process is known by 
 **The demo, in one command** (Docker on macOS, Windows or Linux):
 
 ```bash
-docker build -t wake . && docker run --rm -it -p 127.0.0.1:7700-7701:7700-7701 wake demo
+docker build -t wake . && docker run --rm -it --init -p 127.0.0.1:7700-7701:7700-7701 wake demo
 ```
 
 It builds a person's world, starts their server, runs a stand-in agent that replays commands real agents ran,
@@ -197,7 +203,7 @@ with the reasons: [docs/LIMITS.md](docs/LIMITS.md).
 ## Tests and trials
 
 ```bash
-PYTHONPATH=. python3 -m unittest discover -s tests   # 20 tests: the filter on both machines, both laws
+PYTHONPATH=. python3 -m unittest discover -s tests   # 22 tests: the filter on both machines, both laws
 python3 trials/law1.py        # a person's world against destructive commands
 python3 trials/law2.py        # seven ways to keep running, five ways to stop
 python3 trials/incidents.py   # 46 real incidents

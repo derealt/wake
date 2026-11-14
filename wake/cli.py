@@ -319,5 +319,12 @@ def main(argv=None):
      "keep": cmd_keep, "report": cmd_report, "sessions": cmd_sessions, "view": cmd_view}[args.cmd](args)
 
 
+def entry():
+    try:
+        main()
+    except BrokenPipeError:            # `wake sessions | head` closed the pipe early: not an error
+        os._exit(0)
+
+
 if __name__ == "__main__":
-    main()
+    entry()

@@ -36,6 +36,7 @@ class Laws(unittest.TestCase):
         for p in self.people:
             if p.poll() is None:
                 p.kill()
+            p.wait()
         shutil.rmtree(self.root, ignore_errors=True)
 
     # ---------------------------------------------------------------- helpers
@@ -218,6 +219,46 @@ class Laws(unittest.TestCase):
         self.agent(f"echo 'run-me &' >> {rc}; printf '#!/bin/sh\\nrun-me\\n' > {hooks}/post-commit")
         self.assertEqual(open(rc).read(), "alias ll='ls -la'\n")
         self.assertFalse(os.path.exists(os.path.join(hooks, "post-commit")))
+
+    def test_two_agents_cannot_destroy_each_others_work(self):
+        a = subprocess.Popen([sys.executable, "-m", "wake", "run", "--quiet", "--keep-running", "--", "bash", "-c",
+                              "cd $P && mkdir -p a && for i in 1 2 3; do echo A$i > a/$i.txt; done; exec -a agentA-server sleep 300"],
+                             env=self.env, cwd=self.proj, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            time.sleep(1.2)
+            script = os.path.join(self.root, "b.sh")
+            open(script, "w").write("cd $P\npkill -f agentA-server\nrm -rf a\n")
+            self.wake("run", "--quiet", "--", "bash", script)
+            server = subprocess.run(["pgrep", "-f", "^agentA-server"], capture_output=True, text=True).stdout.strip()
+            self.assertTrue(server, "agent A's server survives agent B")
+            self.restore()                     # the latest session is B's: put back what B destroyed
+            self.assertEqual(open(os.path.join(self.proj, "a", "2.txt")).read(), "A2\n")
+        finally:
+            for sid in self.wake("sessions").stdout.split():
+                if sid[:8].isdigit():
+                    self.wake("stop", sid)
+            a.wait(timeout=30)
+
+    @unittest.skipUnless(shutil.which("node"), "Node.js not installed")
+    def test_a_node_agent(self):
+        self.put("person.txt", "the person wrote this\n")
+        p = self.person_process()
+        js = os.path.join(self.root, "agent.mjs")
+        open(js, "w").write("""
+import fs from "node:fs/promises";
+import { spawn } from "node:child_process";
+await Promise.all(Array.from({length: 50}, (_, i) => fs.writeFile(`out_${i}.txt`, "x")));
+await fs.rm("person.txt");
+spawn("sleep", ["300"], {detached: true, stdio: "ignore"}).unref();
+try { process.kill(Number(process.env.PERSON)); console.log("allowed"); } catch (e) { console.log(e.code); }
+""")
+        env = dict(self.env, PERSON=str(p.pid))
+        r = subprocess.run([sys.executable, "-m", "wake", "run", "--quiet", "--", "node", js], env=env, cwd=self.proj,
+                           capture_output=True, text=True, timeout=60)
+        self.assertIn("EPERM", r.stdout)
+        self.assertIsNone(p.poll())
+        self.restore()
+        self.assertEqual(open(os.path.join(self.proj, "person.txt")).read(), "the person wrote this\n")
 
     def test_whose_explains_with_the_chain(self):
         self.put("mine.txt")
