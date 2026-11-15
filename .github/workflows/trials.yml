@@ -1,0 +1,34 @@
+name: trials
+
+# Builds the image from scratch and runs the tests, both laws and every incident replay,
+# on x86_64 and arm64 Linux.
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  trials:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Machine
+        run: uname -m -r
+      - name: Build
+        run: docker build -t wake .
+      - name: Demo
+        run: docker run --rm --init -e DEMO_EXIT=1 -e SAY_PAUSE=0 -e PACE=0.3 wake demo
+      - name: Tests and trials
+        shell: bash
+        run: |
+          mkdir -p out
+          docker run --rm --init -v "$PWD/out:/opt/wake/trials/results" wake trials | tee out/trials.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.runner }}
+          path: out/

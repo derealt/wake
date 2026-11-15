@@ -6,7 +6,7 @@
 FROM python:3.12-slim
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git procps sqlite3 rsync curl ca-certificates openssh-client \
+ && apt-get install -y --no-install-recommends git procps sqlite3 rsync nodejs curl ca-certificates openssh-client \
  && rm -rf /var/lib/apt/lists/*
 
 # Relate's command line, for live following (`relate serve --read-only=live`). The installer checks
