@@ -17,6 +17,7 @@ import select
 import signal
 import socket
 import stat
+import struct
 import time
 from collections import Counter
 
@@ -42,7 +43,7 @@ libc.process_vm_readv.restype = ctypes.c_ssize_t
 libc.process_vm_readv.argtypes = [ctypes.c_int, ctypes.POINTER(IOV), ctypes.c_ulong,
                                   ctypes.POINTER(IOV), ctypes.c_ulong, ctypes.c_ulong]
 
-PTRACE_TRACEME, PTRACE_CONT, PTRACE_SYSCALL = 0, 7, 24
+PTRACE_TRACEME, PTRACE_POKEDATA, PTRACE_CONT, PTRACE_SYSCALL = 0, 5, 7, 24
 PTRACE_SETOPTIONS, PTRACE_GETEVENTMSG = 0x4200, 0x4201
 PTRACE_GET_SYSCALL_INFO = 0x420E
 OPTIONS = 0x1 | 0x2 | 0x4 | 0x8 | 0x10 | 0x80 | 0x100000   # sysgood fork vfork clone exec seccomp exitkill
@@ -72,12 +73,14 @@ def parent_of(pid):
 
 
 class Supervisor:
-    def __init__(self, session, stop_on_exit=True, triggers=True, sweep=True):
+    def __init__(self, session, stop_on_exit=True, triggers=True, sweep=True, docker=True):
         self.s = session
         self.m = Machine()
         self.stop_on_exit = stop_on_exit
         self.do_triggers = triggers
         self.do_sweep = sweep
+        self.want_docker = docker
+        self.docker = None                 # the Docker adapter (docker.py), when there is a daemon
         self.protect = os.path.realpath(session.home) + "/"
         self.body = None
         self.vault = Vault(session.vault)
@@ -111,16 +114,23 @@ class Supervisor:
         self.handlers["truncate"] = self.h_truncate
         self.handlers["ptrace"] = self.h_reach
         self.handlers["process_vm_writev"] = self.h_reach
+        self.handlers["connect"] = self.h_connect
 
     # ================================================================ start and loop
     def run(self, argv, env):
         libc.prctl(36, ctypes.c_ulong(1), ctypes.c_ulong(0), ctypes.c_ulong(0), ctypes.c_ulong(0))  # child subreaper
+        if self.want_docker:
+            from .docker import Adapter
+            self.docker = Adapter.prepare(self, env)
+            if self.docker:
+                env = dict(env, DOCKER_HOST=f"unix://{self.docker.sock_path}")
+        extra = ("connect",) if self.docker else ()
         pid = os.fork()
         if pid == 0:
             try:
                 ptrace(PTRACE_TRACEME, 0)
                 os.kill(os.getpid(), signal.SIGSTOP)
-                seccomp.install(self.m)
+                seccomp.install(self.m, extra)
                 os.execvpe(argv[0], argv, env)
             except BaseException as e:   # noqa: BLE001
                 try:
@@ -138,6 +148,11 @@ class Supervisor:
         self.keys[pid] = key
         self.body.root(key, pid, " ".join(argv)[:300], os.getcwd())
         self.note("start", pid=pid, cmd=argv)
+        if self.docker:
+            self.docker.start()
+            self.body.session_set(docker=self.docker.upstream)
+            self.s.update(docker=self.docker.upstream)
+            self.note("docker", daemon=self.docker.upstream, through=self.docker.sock_path)
         self.s.update(status="running", supervisor=os.getpid(), agent=pid)
         ptrace(PTRACE_CONT, pid, 0, 0)
         return self.loop()
@@ -156,13 +171,16 @@ class Supervisor:
             if self.stop_asked and not self.stopping:
                 self.begin_stop(self.stop_asked)
             busy = self.reap()
+            if self.docker:
+                self.docker.run_calls()
             self.body.tick()
             if self.stopping and self.stop_done is None and not self.unadopted():
                 self.complete_stop()
             if not self.tracees:
                 break
             if not busy:
-                ready, _, _ = select.select([rfd] + ([ctl] if ctl else []), [], [], 0.1)
+                waits = [rfd] + ([ctl] if ctl else []) + ([self.docker.wake_r] if self.docker else [])
+                ready, _, _ = select.select(waits, [], [], 0.1)
                 if rfd in ready:
                     try:
                         while os.read(rfd, 512):
@@ -199,6 +217,8 @@ class Supervisor:
                 continue
             busy, idle = True, 0
             self.handle(tid, status)
+            if self.docker and not self.docker.calls.empty():
+                self.docker.run_calls()
 
     def handle(self, tid, status):
         if os.WIFEXITED(status) or os.WIFSIGNALED(status):
@@ -568,6 +588,44 @@ class Supervisor:
             return CONT
         return self.refuse_reach(tid, me, name, target, name)
 
+    def h_connect(self, tid, me, name, a):
+        """A connect() to the Docker daemon's own socket is turned towards WAKE's: the path is rewritten in place."""
+        d = self.docker
+        addr, size = a[1], a[2] & 0xFFFFFFFF
+        if not d or not addr or size < 4 or size > 110:
+            return CONT
+        raw = self.read_bytes(tid, addr, size)
+        if not raw or len(raw) < size or struct.unpack("=H", raw[:2])[0] != socket.AF_UNIX or raw[2:3] == b"\0":
+            return CONT
+        sun = raw[2:]
+        given = sun.split(b"\0", 1)[0]
+        path = os.fsdecode(given)
+        if not path.startswith("/"):
+            try:
+                path = os.path.join(os.readlink(f"/proc/{tid}/cwd"), path)
+            except OSError:
+                return CONT
+        if os.path.realpath(path) != d.upstream_real:
+            return CONT
+        new = os.fsencode(d.short or "")
+        if not d.short or len(new) > len(given):
+            return self.refuse(tid, me, "connect", path, "the Docker daemon is reached through WAKE (DOCKER_HOST)")
+        self.poke(tid, addr + 2, new + b"\0" * (len(sun) - len(new)))
+        self.counts["redirected"] += 1
+        self.note("redirected", path=path, to=d.sock_path, by=me)
+        return CONT
+
+    def poke(self, tid, addr, data):
+        start = addr - addr % 8
+        end = addr + len(data)
+        end += (-end) % 8
+        cur = bytearray(self.read_bytes(tid, start, end - start) or b"")
+        if len(cur) != end - start:
+            raise OSError(errno.EFAULT, "cannot read the agent's memory")
+        cur[addr - start:addr - start + len(data)] = data
+        for off in range(0, len(cur), 8):
+            ptrace(PTRACE_POKEDATA, tid, start + off, int.from_bytes(cur[off:off + 8], "little"))
+
     # ---------------------------------------------------------------- helpers for Law 1
     def mine_pid(self, pid):
         """True if the process is the agent's, False if it is not, None if it does not exist."""
@@ -702,7 +760,12 @@ class Supervisor:
 
     def complete_stop(self):
         """Every process of the body is gone (except what you adopted): finish Law 2 and report."""
-        removed, reverted, swept, escaped = [], [], [], []
+        removed, reverted, swept, escaped, containers = [], [], [], [], []
+        if self.docker:                       # its containers first: they run outside the body's processes
+            try:
+                containers = self.docker.stop_all()
+            except OSError as e:
+                self.note("error", docker=str(e))
         if self.do_sweep:                     # first, while its planted files are still where it put them
             swept = self.sweep()
         if self.do_triggers:
@@ -714,7 +777,7 @@ class Supervisor:
                     escaped.append(r["pid"])
                 except OSError:
                     pass
-        self.stop_done = self.summary(removed, reverted, swept, escaped)
+        self.stop_done = self.summary(removed, reverted, swept, escaped, containers)
         self.body.event("stopped", json.dumps(self.stop_done))
         self.body.session_set(status="stopped", stopped=time.time())
         self.note("stopped", **self.stop_done)
@@ -722,14 +785,15 @@ class Supervisor:
         if self.on_stopped:
             self.on_stopped(self.stop_done)
 
-    def summary(self, removed=(), reverted=(), swept=(), escaped=()):
+    def summary(self, removed=(), reverted=(), swept=(), escaped=(), containers=()):
         c = self.body.counts()
         r = {"stopped": self.stopping, "reason": self.stop_reason,
              "ms": round((time.monotonic() - self.stop_t0) * 1000, 1) if self.stopping else None,
              "removed_triggers": list(removed), "restored_triggers": list(reverted), "swept": list(swept),
              "escaped": list(escaped), "processes": c.get("processes"), "made": c.get("made"),
              "kept": c.get("kept"), "refused": c.get("refused"), "narrowed": self.counts["narrowed"],
-             "checked": self.counts["checked"], "adopted_running": len(self.adopted & set(self.tracees.values()))}
+             "checked": self.counts["checked"], "adopted_running": len(self.adopted & set(self.tracees.values())),
+             "containers": list(containers), "docker": c.get("docker") if self.docker else None}
         if self.root_status is not None:
             r["exit"] = os.waitstatus_to_exitcode(self.root_status)
         return r
@@ -747,6 +811,8 @@ class Supervisor:
         else:
             self.body.session_set(ended=time.time())
         self.note("finished", **summary)
+        if self.docker:
+            self.docker.close()
         self.body.close()
         return summary
 
@@ -889,6 +955,10 @@ def offline_stop(session):
     sup.stopping = True
     sup.stop_reason = "wake stop, after the supervisor had gone"
     sup.stop_t0 = time.monotonic()
+    daemon = session.meta().get("docker")
+    if daemon and os.path.exists(daemon):
+        from .docker import Adapter
+        sup.docker = Adapter(sup, daemon, None)
     for r in sup.body.alive():
         if proc_key(r["pid"]) == r["key"]:
             try:

@@ -29,8 +29,8 @@ class SockFprog(ctypes.Structure):
     _fields_ = [("len", ctypes.c_ushort), ("filter", ctypes.POINTER(SockFilter))]
 
 
-def program(m: Machine):
-    """Return the filter as a list of (code, jt, jf, k)."""
+def program(m: Machine, extra=()):
+    """Return the filter as a list of (code, jt, jf, k). `extra` names calls to trace as well."""
     ins, labels = [], {}
 
     def op(code, k=0, jt=None, jf=None):
@@ -50,7 +50,7 @@ def program(m: Machine):
     for n in REFUSE_EPERM:
         if n in m.nr:
             op(JEQ, m.nr[n], jt="eperm")
-    for n in TRACE_ALWAYS:
+    for n in list(TRACE_ALWAYS) + list(extra):
         if n in m.nr:
             op(JEQ, m.nr[n], jt="trace")
     for n, arg in TRACE_IF_WRITE.items():
@@ -79,9 +79,9 @@ def program(m: Machine):
     return out
 
 
-def install(m: Machine):
+def install(m: Machine, extra=()):
     """Install the filter on the calling process. It is inherited by every child and kept across exec."""
-    ins = program(m)
+    ins = program(m, extra)
     arr = (SockFilter * len(ins))(*[SockFilter(*x) for x in ins])
     prog = SockFprog(len(ins), arr)
     libc = ctypes.CDLL(None, use_errno=True)

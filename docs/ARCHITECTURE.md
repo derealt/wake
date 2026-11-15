@@ -12,6 +12,7 @@
 | Vault | `wake/vault.py` | Where your things are kept before a call changes them. |
 | Restore | `wake/restore.py` | Puts your things back; moves whatever stands in the way into the vault. |
 | Start-up places | `wake/triggers.py` | Paths that make something run later (shell start-up, cron, systemd, git hooks...). |
+| Docker adapter | `wake/docker.py` | Stands between the agent and the Docker daemon: checks each request against the body graph, records what the agent creates, stops its containers at the end. |
 | Live view | `wake/viewer.py`, `wake/view/index.html` | `relate serve --read-only=live` on the store, and a page that asks it questions. |
 | Command line | `wake/cli.py` | `run`, `stop`, `restore`, `whose`, `keep`, `view`, `report`, `mine`, `kill-mine`. |
 
@@ -42,6 +43,9 @@ processes, held back from yours, and the agent is told they succeeded.
         -[:MADE {at}]->(:File {key: "dev:ino:birth", path, kind, gone, adopted})
         -[:CHANGED {how, at, path}]->(:Kept {key, path, now, whys, store, store_kind, restored})
         -[:TRIED {call, detail, at}]->(:Process {yours: true})
+        -[:MADE {at}]->(:Docker {key: "container:<id>" | "volume:<name>@<created>" | "network:<id>" | "image:<id>",
+                                 kind, name, gone, adopted})
+        -[:TRIED {call, detail, at}]->(:Docker {yours: true})
    -[:LOGGED]->(:Event {kind, detail, at})
 ```
 
@@ -51,6 +55,29 @@ processes, held back from yours, and the agent is told they succeeded.
 - **Adoption** (`wake keep`) is pushed down the tree when it happens: the adopted process, every process below it
   and every file they made are marked. The ownership check stays one step; the process check walks the path and
   stops at anything adopted.
+
+## The Docker daemon
+
+The daemon runs as root and acts for whoever asks, so a container removed at the agent's request leaves no trace
+in the agent's own system calls. WAKE stands in front of it:
+
+1. **One way in.** `wake run` listens on a socket in the session folder and gives the agent
+   `DOCKER_HOST=unix://<that socket>`. The filter also traces `connect()`: a connection to the daemon's own socket
+   (a hard-coded path, `docker -H`, an SDK) has its address rewritten in the agent's memory, before the kernel reads
+   it, to a short link to WAKE's socket. The agent never reaches the daemon directly.
+2. **Who is asking.** Each connection's process comes from `SO_PEERCRED`; its key is the same `pid:starttime`
+   as everywhere else, so requests hang off the same process nodes as files.
+3. **Law 1 per request.** Creating a container, volume, network or image (pull, build, commit) records it with
+   `MADE`. Removing, stopping, killing, changing or entering one asks
+   `MATCH (p:Process)-[:MADE]->(d:Docker {key: $key}) WHERE d.gone IS NULL AND d.adopted IS NULL RETURN p.key LIMIT 1`;
+   not the agent's, and the daemon answers 403 with the reason. Prunes are answered by WAKE, removing only the
+   agent's things. A container's settings are rewritten before the daemon sees them: your folders and volumes
+   read-only, privileged and host-namespace containers refused.
+4. **One thread for the graph.** A Relate connection belongs to the thread that opened it. The adapter serves each
+   connection on its own thread, and every graph question goes back to the supervisor's thread through a queue and
+   a wake-up pipe in its loop, answered between stops.
+5. **Law 2.** At the stop, before the process sweep, every container the agent made has its restart policy set to
+   "no" and is killed.
 
 ## Law 2, the stop
 

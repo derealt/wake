@@ -24,6 +24,8 @@ CALLS = {
     # things that reach other processes
     "kill": (129, 62), "tkill": (130, 200), "tgkill": (131, 234), "pidfd_send_signal": (424, 424),
     "ptrace": (117, 101), "process_vm_writev": (271, 311),
+    # traced only when the Docker adapter is on: a connect() to the daemon's socket is turned towards WAKE's
+    "connect": (203, 42),
     # refused before any check. io_uring would let file operations bypass the checks;
     # callers fall back to ordinary calls when it reports "not supported".
     "io_uring_setup": (425, 425), "io_uring_enter": (426, 426), "io_uring_register": (427, 427),

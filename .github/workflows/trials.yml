@@ -32,3 +32,30 @@ jobs:
         with:
           name: results-${{ matrix.runner }}
           path: out/
+
+  docker:
+    # The Docker adapter on the runner itself, against the runner's own daemon (thrown away after the job).
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install .
+      - name: Machine and daemon
+        run: uname -m -r && docker version -f '{{.Server.Version}}'
+      - name: Docker adapter tests (stand-in daemon)
+        run: python -m unittest -v tests.test_docker
+      - name: Docker incidents on a real daemon
+        run: WAKE_TRIAL_DOCKER=1 python trials/docker.py
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: docker-results-${{ matrix.runner }}
+          path: trials/results/docker.json

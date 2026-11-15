@@ -7,21 +7,38 @@ something it does not promise.
 
 - **Linux, kernel 5.3 or later, on aarch64 or x86_64.** WAKE uses ptrace with a seccomp filter and
   `PTRACE_GET_SYSCALL_INFO`. On macOS and Windows, run the agent inside Docker or a Linux virtual machine.
-  The x86_64 filter is checked by the test suite's filter interpreter; the full trials in this repository were
-  run on aarch64.
+  The tests and every trial run on both, on each push (GitHub Actions: x86_64 and arm64 runners).
 
 ## What it governs
 
-- **Destruction on the machine the agent runs on: files, folders and processes.** It is not a sandbox. The agent
+- **Destruction on the machine the agent runs on: files, folders, processes, and what the Docker daemon holds for
+  you (containers, volumes, networks, images).** It is not a sandbox. The agent
   can still read anything you can and talk to the network. WAKE does not stop a secret from being read and sent.
   Use it alongside network controls, not instead of them.
-- **Things done by another service are outside it.** A database server, the Docker daemon, systemd, a tmux server
-  you already had running, a cloud API: WAKE sees the agent talk to them, not what they then do. If the agent asks
-  the Docker daemon to remove your container, the daemon removes it. A SQLite database is a file and is covered;
-  a PostgreSQL server is not. Adapters that route a service through WAKE (the Docker socket, the PostgreSQL wire
-  protocol) are the planned answer.
+- **The Docker daemon is covered through an adapter; other services are outside it.** The daemon acts for the
+  agent, so WAKE stands between them (see below). A database server, systemd, a tmux server you already had
+  running, a cloud API: WAKE sees the agent talk to them, not what they then do. A SQLite database is a file and is
+  covered; a PostgreSQL server is not. The same adapter pattern fits the PostgreSQL wire protocol; it is not built.
 - **Remote resources.** 26 of the 108 incidents in [INCIDENTS.md](INCIDENTS.md) destroyed something hosted
   elsewhere. WAKE does not reach them.
+
+## The Docker adapter
+
+- **It covers a daemon on a Unix socket** (the usual `/var/run/docker.sock`, a rootless daemon's socket, or
+  `DOCKER_HOST=unix://...`). A daemon reached over TCP is not covered, and WAKE says nothing about it. `wake run
+  --no-docker` turns the adapter off.
+- **Your things are refused, not kept.** Files are copied before the agent changes them; a container or volume is
+  not. A request to remove, stop, kill, change or enter one of yours is refused, and the agent is told why.
+- **Your folders and volumes are read-only inside the agent's containers.** A container that needs to write into
+  your project (`npm install` into a mounted folder, say) cannot. Folders and volumes the agent made are mounted as
+  asked. Privileged containers, the machine's process or IPC namespaces, raw devices and the daemon's own socket are
+  refused.
+- **Entering your containers is refused**, read-only uses included (`docker exec db psql -c 'select 1'`): a command
+  inside a container cannot be checked. Logs, inspect and every other read pass.
+- **Not checked:** `docker tag` (it can move one of your tags to another image); swarm objects, plugins and secrets
+  (every change to them is refused); the build cache (a prune leaves it alone).
+- **Law 2:** the agent's containers are killed and their restart policy set to "no", so a daemon restart does not
+  bring them back. They are not removed: like the files it made, they stay for you to look at.
 
 ## Law 2, the stop
 

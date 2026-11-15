@@ -17,6 +17,7 @@ SCHEMA = [
     "CREATE INDEX file_path IF NOT EXISTS FOR (f:File) ON (f.path)",
     "CREATE INDEX kept_key IF NOT EXISTS FOR (k:Kept) ON (k.key)",
     "CREATE INDEX kept_path IF NOT EXISTS FOR (k:Kept) ON (k.path)",
+    "CREATE INDEX docker_key IF NOT EXISTS FOR (d:Docker) ON (d.key)",
 ]
 
 # ---- the laws, as queries. These strings are shown in the README and the live view.
@@ -33,6 +34,12 @@ MINE_PROCESS = """
 MATCH path = (p:Process {key: $key})<-[:SPAWNED]-+(:Session)
 WHERE none(n IN nodes(path) WHERE coalesce(n.adopted, false))
 RETURN length(path) AS depth LIMIT 1"""
+
+# Law 1 for what the Docker daemon holds (containers, volumes, networks, images): did the agent create it?
+MINE_DOCKER = """
+MATCH (p:Process)-[:MADE]->(d:Docker {key: $key})
+WHERE d.gone IS NULL AND d.adopted IS NULL
+RETURN p.key AS by LIMIT 1"""
 
 # Law 2: the whole body that is still alive, however far it has wandered from its parent.
 BODY_ALIVE = """
@@ -213,6 +220,33 @@ class Body:
     def session_set(self, **props):
         self.q("MATCH (s:Session {id: $sid}) SET s += $p", {"sid": self.sid, "p": props})
 
+    # ------------------------------------------------------------ what the Docker daemon holds for the agent
+    def made_docker(self, pkey, kind, key, oid, name, detail=""):
+        self.flush()
+        self.q("""MATCH (p:Process {key: $p})
+                  CREATE (p)-[:MADE {at: $t}]->(:Docker {key: $k, kind: $kind, oid: $oid, name: $name,
+                                                         detail: $d, born: $t, adopted: p.adopted})""",
+               {"p": pkey, "k": key, "kind": kind, "oid": oid, "name": name, "d": detail, "t": now()})
+
+    def docker_gone(self, key):
+        self.q("MATCH (d:Docker {key: $k}) WHERE d.gone IS NULL SET d.gone = $t", {"k": key, "t": now()})
+
+    def tried_docker(self, pkey, call, key, kind, name, detail):
+        self.flush()
+        self.q("""MATCH (p:Process {key: $p})
+                  MERGE (y:Docker {key: $k})
+                  ON CREATE SET y.kind = $kind, y.name = $name, y.yours = true
+                  CREATE (p)-[:TRIED {call: $call, detail: $d, at: $t, outcome: 'refused'}]->(y)""",
+               {"p": pkey, "k": key, "kind": kind, "name": name, "call": call, "d": detail, "t": now()})
+
+    def mine_docker(self, key):
+        return bool(self.q(MINE_DOCKER, {"key": key}))
+
+    def docker_live(self, kind=None):
+        return self.q("""MATCH (:Process)-[:MADE]->(d:Docker)
+                         WHERE d.gone IS NULL AND d.adopted IS NULL AND ($kind IS NULL OR d.kind = $kind)
+                         RETURN d.key AS key, d.kind AS kind, d.oid AS oid, d.name AS name""", {"kind": kind})
+
     def mark_restored(self, fkey):
         self.q("MATCH (k:Kept {key: $k}) SET k.restored = $t", {"k": fkey, "t": now()})
 
@@ -255,6 +289,8 @@ class Body:
                       WITH s, processes, count(DISTINCT f) AS made
                       OPTIONAL MATCH (k:Kept)
                       WITH s, processes, made, count(DISTINCT k) AS kept
-                      OPTIONAL MATCH (:Process)-[t:TRIED]->(:Process)
-                      RETURN processes, made, kept, count(t) AS refused""", {"sid": self.sid})
+                      OPTIONAL MATCH (:Process)-[t:TRIED]->()
+                      WITH s, processes, made, kept, count(t) AS refused
+                      OPTIONAL MATCH (:Process)-[:MADE]->(d:Docker)
+                      RETURN processes, made, kept, refused, count(DISTINCT d) AS docker""", {"sid": self.sid})
         return r[0] if r else {}

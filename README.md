@@ -80,6 +80,23 @@ everything the agent ever started.
 agent A made is "yours". When B ran `pkill -f` on A's server and `rm -rf` on A's work, the kills were refused and
 A's files were kept; restoring B's session put them back (`tests/test_laws.py`).
 
+**The Docker daemon, too.** The daemon runs as root outside the agent, so whatever the agent asks of it happens
+where no system call shows it: `docker stop $(docker ps -q)` takes your database container with it (incident C40).
+WAKE stands between the agent and the daemon: the agent is given WAKE's socket, and a connection it makes straight
+to the daemon's own socket is turned towards WAKE's. Containers, volumes, networks and images the agent creates
+join its body graph; yours it cannot remove, stop, kill or enter; prunes reach only its own; your folders and
+volumes are read-only inside its containers. Real commands on a real daemon (`trials/docker.py`):
+
+| What the agent ran | Agent alone | Under WAKE |
+|---|---|---|
+| `docker stop $(docker ps -q)` after starting its own container | your database and app stopped | only its own stopped |
+| `docker rm -f $(docker ps -aq)` | your 3 containers removed | none of yours removed |
+| `docker system prune -af --volumes` | your finished job and your network removed | none of yours removed |
+| `docker volume rm shop-backup` | your backup removed | refused |
+| `docker run -v "$PWD":/w alpine rm -rf /w/*` | 21 project files lost | read-only: nothing lost |
+| `docker exec shop-db sh -c 'rm -rf /data/*'` | your orders destroyed | refused |
+| it leaves a worker with `--restart always`, then is stopped | still running | stopped, restart policy off |
+
 **What it costs.** The kernel stops the agent only on calls that could destroy something; reads, writes to open
 files, network and computation run at full speed. Medians of three runs, Linux 6.12 on aarch64 (Docker on Apple Silicon):
 
@@ -102,6 +119,7 @@ files, network and computation run at full speed. Medians of three runs, Linux 6
                        ┌─────────────────────────────┐
                        │  WAKE supervisor (ptrace)    │──── keeps your things in the vault first
                        │                              │──── refuses reaches into your processes
+                       │  + Docker adapter            │◀─── the agent's requests to the Docker daemon
                        │   Relate, embedded:          │
                        │   the agent's body graph     │◀─── every decision is a Cypher query here
                        └──────────────┬──────────────┘
@@ -170,6 +188,9 @@ Why Relate, and not a database across a socket:
   `wake view` shows the agent's body in your browser as it changes, straight from Relate's HTTP Query API.
 - **Paths are first-class.** Lineage (`-[:SPAWNED]->+`), adoption that cuts a branch off, the explanation behind
   `wake whose`: these are path questions, asked in quantified path patterns.
+- **One graph for everything the agent touches.** A container the agent asked the Docker daemon for hangs off the
+  same process node as the files that process wrote: `(:Process)-[:MADE]->(:Docker {kind: 'container'})`. The
+  Docker adapter asks the same one-step ownership question as the file check.
 
 ## Try it
 
@@ -214,17 +235,19 @@ see [docs/AGENTS.md](docs/AGENTS.md) for the instructions to give it.
 
 WAKE governs what an agent can destroy on the machine it runs on. It is not a sandbox: the agent can still read
 anything you can, and talk to the network. Things done through a service that runs outside the agent (a database
-server, the Docker daemon, a cloud API) are outside its reach unless they are routed through WAKE. The full list,
+server, systemd, a cloud API) are outside its reach unless they are routed through WAKE, as the Docker daemon is.
+The full list,
 with the reasons: [docs/LIMITS.md](docs/LIMITS.md).
 
 ## Tests and trials
 
 ```bash
-PYTHONPATH=. python3 -m unittest discover -s tests   # 22 tests: the filter on both machines, both laws
+PYTHONPATH=. python3 -m unittest discover -s tests   # 26 tests: the filter on both machines, both laws, Docker
 python3 trials/law1.py        # a person's world against destructive commands
 python3 trials/law2.py        # seven ways to keep running, five ways to stop
 python3 trials/incidents.py   # 47 real incidents
 python3 trials/bench.py       # what it costs
+WAKE_TRIAL_DOCKER=1 python3 trials/docker.py   # Docker incidents: ONLY on a disposable daemon
 ```
 
 The trials run as root inside a container and play the person and the agent as an ordinary user.

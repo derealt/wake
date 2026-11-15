@@ -14,6 +14,9 @@ was here before you started belongs to the person, and WAKE keeps a copy before 
   Do not use `pkill -f` or `killall`: they match the person's processes too, and WAKE will refuse those.
 - **If a kill fails with "Operation not permitted",** that process is the person's. Leave it alone and tell them.
 - **To check who made something:** `wake whose PATH` or `wake whose PID`.
+- **Docker:** containers, volumes, networks and images you create are yours to stop and remove. The person's are
+  refused ("is yours, not the agent's"), and the person's folders and volumes are mounted read-only in your
+  containers. Use `docker ps --filter name=...` with names you chose rather than `docker stop $(docker ps -q)`.
 - **When you change or delete the person's files,** say so plainly in your summary. Their originals are kept and
   `wake restore` puts them back, but the person should know what you touched.
 

@@ -93,7 +93,7 @@ footer .why b{color:var(--text)}
   <div class="counter agent"><div class="n" id="c-alive">0</div><div class="l">of its processes running</div></div>
   <div class="counter"><div class="n" id="c-made">0</div><div class="l">files and folders it made</div></div>
   <div class="counter yours"><div class="n" id="c-kept">0</div><div class="l">things of yours it touched, kept</div></div>
-  <div class="counter refused"><div class="n" id="c-refused">0</div><div class="l">reaches into your processes refused</div></div>
+  <div class="counter refused"><div class="n" id="c-refused">0</div><div class="l">reaches into your processes and containers refused</div></div>
   <div class="counter ok"><div class="n" id="c-stop">–</div><div class="l" id="c-stop-l">stopped in</div></div>
 </section>
 <main>
@@ -127,7 +127,7 @@ const Q = {
   procs: "MATCH (a)-[:SPAWNED]->(p:Process) RETURN p.key AS key, p.pid AS pid, p.cmd AS cmd, p.alive AS alive, p.adopted AS adopted, p.born AS born, CASE WHEN a:Session THEN null ELSE a.key END AS parent ORDER BY p.born LIMIT 600",
   made: "MATCH (p:Process)-[:MADE]->(f:File) RETURN p.key AS key, count(f) AS made",
   kept: "MATCH (k:Kept) RETURN k.path AS path, k.whys AS whys, k.restored AS restored, k.first AS first ORDER BY k.first DESC LIMIT 300",
-  tried: "MATCH (p:Process)-[t:TRIED]->(y:Process) RETURN p.key AS by, y.key AS key, y.pid AS pid, y.cmd AS cmd, t.detail AS what, t.at AS at ORDER BY t.at",
+  tried: "MATCH (p:Process)-[t:TRIED]->(y) RETURN p.key AS by, y.key AS key, y.pid AS pid, y.kind AS kind, coalesce(y.cmd, y.name) AS cmd, t.detail AS what, t.at AS at ORDER BY t.at",
   events: "MATCH (:Session)-[:LOGGED]->(e:Event) RETURN e.kind AS kind, e.detail AS detail, e.at AS at ORDER BY e.at DESC LIMIT 60"
 };
 async function ask(statement){
@@ -188,7 +188,7 @@ function drawTree(procs, made, tried){
       const mx = bx + (YX - bx) * 0.55, my = by + (yy - by) * 0.5;
       out += `<line class="x" x1="${mx-6}" y1="${my-6}" x2="${mx+6}" y2="${my+6}"/><line class="x" x1="${mx-6}" y1="${my+6}" x2="${mx+6}" y2="${my-6}"/>`;
     }
-    out += `<g class="yours"><circle cx="${YX}" cy="${yy}" r="9"/><text x="${YX+16}" y="${yy-2}">yours · ${esc(y.pid)}</text><text x="${YX+16}" y="${yy+12}">${esc(short(y.cmd, 30))}</text><title>${esc(y.cmd)}</title></g>`;
+    out += `<g class="yours"><circle cx="${YX}" cy="${yy}" r="9"/><text x="${YX+16}" y="${yy-2}">yours · ${esc(y.pid ?? y.kind)}</text><text x="${YX+16}" y="${yy+12}">${esc(short(y.cmd, 30))}</text><title>${esc(y.cmd)}</title></g>`;
   });
   for (const n of nodes){
     if (n.ghost){
@@ -247,7 +247,7 @@ async function tick(){
     const more = kept.length > 10 ? [`<li><span class="how ev"></span><span class="what">and ${kept.length - 10} more, all kept</span></li>`] : [];
     list("kept", kept.slice(0, 10).map(k => `<li><span class="how">${esc([...new Set((k.whys||[]).map(w => HOW[w] || w))].join(", "))}</span><span class="what" title="${esc(k.path)}">${esc(rel(k.path))}${k.restored ? '<span class="back">put back</span>' : ""}</span></li>`).concat(more),
          "Nothing of yours has been touched.");
-    list("refused", tried.map(t => `<li><span class="how refused">${esc(t.what)}</span><span class="what" title="${esc(t.cmd)}">to ${esc(t.pid)} ${esc(short(t.cmd, 40))}</span></li>`)
+    list("refused", tried.map(t => `<li><span class="how refused">${esc(t.what)}</span><span class="what" title="${esc(t.cmd)}">to ${esc(t.pid ?? t.kind)} ${esc(short(t.cmd, 40))}</span></li>`)
          .concat(events.filter(e => e.kind === "narrowed" || e.kind === "refused").map(e => `<li><span class="how refused">${e.kind === "narrowed" ? "narrowed" : "refused"}</span><span class="what" title="${esc(e.detail)}">${esc(e.detail)}</span></li>`)),
          "Nothing has reached for your processes.");
     list("events", events.filter(e => e.kind !== "narrowed" && e.kind !== "refused").slice(0, 20).map(e => {

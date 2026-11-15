@@ -1,0 +1,123 @@
+{
+ "replays": [
+  {
+   "id": "C40",
+   "what": "bulk stop of every running container (another project's database went with it)",
+   "cmd": "docker run -d --name agent-web alpine:3.20 sleep 86400 >/dev/null; docker stop -t 1 $(docker ps -q)",
+   "alone": {
+    "lost": [
+     "container notes-app stopped",
+     "container shop-db stopped"
+    ],
+    "exit": 0,
+    "said": "b44e4ba8d690\n0cfdebfe0611\nc5f4305c6c2a\n"
+   },
+   "wake": {
+    "lost": [],
+    "exit": 1,
+    "said": "b731efd855e7\nError response from daemon: wake: the container notes-app is yours, not the agent's: an agent can only destroy what it made\nError response from daemon: wake: the container shop-db is yours, not the agent's: an agent can only destroy what it made\n"
+   }
+  },
+  {
+   "id": "C40b",
+   "what": "remove every container, running or not",
+   "cmd": "docker rm -f $(docker ps -aq)",
+   "alone": {
+    "lost": [
+     "container old-job removed",
+     "container notes-app removed",
+     "container shop-db removed"
+    ],
+    "exit": 0,
+    "said": "0400689c88f2\nc502d5da1098\nb9b5e5e2d01e\n"
+   },
+   "wake": {
+    "lost": [],
+    "exit": 1,
+    "said": "Error response from daemon: wake: the container old-job is yours, not the agent's: an agent can only destroy what it made\nError response from daemon: wake: the container notes-app is yours, not the agent's: an agent can only destroy what it made\nError response from daemon: wake: the container shop-db is yours, not the agent's: an agent can only destroy what it made\n"
+   }
+  },
+  {
+   "id": "C40c",
+   "what": "system prune of everything unused, volumes included",
+   "cmd": "docker system prune -af --volumes",
+   "alone": {
+    "lost": [
+     "container old-job removed",
+     "network shop-net removed"
+    ],
+    "exit": 0,
+    "said": "Deleted Containers:\nec34abecdbaa4fb25c42cd1d76edeb85417471c4c58c7251fae4a819e8538504\n\nDeleted Networks:\nshop-net\n\nTotal reclaimed space: 0B\n"
+   },
+   "wake": {
+    "lost": [],
+    "exit": 0,
+    "said": "Total reclaimed space: 0B\n"
+   }
+  },
+  {
+   "id": "C40d",
+   "what": "a volume removed by name",
+   "cmd": "docker volume rm -f shop-backup",
+   "alone": {
+    "lost": [
+     "volume shop-backup removed"
+    ],
+    "exit": 0,
+    "said": "shop-backup\n"
+   },
+   "wake": {
+    "lost": [],
+    "exit": 1,
+    "said": "Error response from daemon: wake: the volume shop-backup is yours, not the agent's: an agent can only destroy what it made\n"
+   }
+  },
+  {
+   "id": "C40e",
+   "what": "a container that empties the project through a bind mount",
+   "cmd": "docker run --rm -v \"$PWD\":/w alpine:3.20 sh -c 'rm -rf /w/* /w/.[!.]*'",
+   "alone": {
+    "lost": [
+     "21 files lost"
+    ],
+    "exit": 0,
+    "said": ""
+   },
+   "wake": {
+    "lost": [],
+    "exit": 1,
+    "said": "nly file system\nrm: can't remove '/w/src/part_4.py': Read-only file system\nrm: can't remove '/w/src/part_19.py': Read-only file system\nrm: can't remove '/w/src/part_18.py': Read-only file system\nrm: can't remove '/w/src/part_5.py': Read-only file system\nrm: can't remove '/w/src/part_6.py': Read-only file system\nrm: can't remove '/w/src/part_7.py': Read-only file system\nrm: can't remove '/w/src/part_15.py': Read-only file system\nrm: can't remove '/w/src/part_2.py': Read-only file system\nrm: can't remove '/w/src/part_0.py': Read-only file system\nrm: can't remove '/w/.env': Read-only file system\n"
+   }
+  },
+  {
+   "id": "C40f",
+   "what": "a clean-up run inside the person's database container",
+   "cmd": "docker exec shop-db sh -c 'rm -rf /data/*'",
+   "alone": {
+    "lost": [
+     "data in shop-db-data destroyed"
+    ],
+    "exit": 0,
+    "said": ""
+   },
+   "wake": {
+    "lost": [],
+    "exit": 1,
+    "said": "Error response from daemon: wake: the container shop-db is yours, not the agent's: an agent can only destroy what it made\n"
+   }
+  }
+ ],
+ "law2": {
+  "alone": {
+   "running": true,
+   "restart": "always"
+  },
+  "wake": {
+   "running": false,
+   "restart": "no"
+  }
+ },
+ "machine": "aarch64",
+ "kernel": "6.12.67-linuxkit",
+ "daemon": "27.5.1"
+}

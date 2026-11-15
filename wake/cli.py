@@ -30,7 +30,7 @@ def plural(n, one, many=None):
 # ---------------------------------------------------------------- run
 def cmd_run(argv):
     if "--" not in argv:
-        raise SystemExit("usage: wake run [--keep-running] [--no-triggers] [--no-sweep] -- COMMAND...")
+        raise SystemExit("usage: wake run [--keep-running] [--no-triggers] [--no-sweep] [--no-docker] -- COMMAND...")
     i = argv.index("--")
     opts, command = argv[:i], argv[i + 1:]
     if not command:
@@ -43,7 +43,8 @@ def cmd_run(argv):
     if not quiet:
         say(f"session {s.id}. Stop it with `wake stop`; watch it with `wake view`.")
     sup = Supervisor(s, stop_on_exit="--keep-running" not in opts,
-                     triggers="--no-triggers" not in opts, sweep="--no-sweep" not in opts)
+                     triggers="--no-triggers" not in opts, sweep="--no-sweep" not in opts,
+                     docker="--no-docker" not in opts)
     printed = []
 
     def stopped(r):
@@ -69,11 +70,14 @@ def print_summary(r):
         say(f"it changed, moved or deleted {plural(r['kept'], 'thing')} of yours. "
             "Your originals are kept: `wake restore` puts them back.")
     if r.get("refused") or r.get("narrowed"):
-        say(f"it reached for your processes {plural((r.get('refused') or 0) + (r.get('narrowed') or 0), 'time')}. "
+        yours = "your processes or containers" if r.get("docker") is not None else "your processes"
+        say(f"it reached for {yours} {plural((r.get('refused') or 0) + (r.get('narrowed') or 0), 'time')}. "
             "WAKE let none of it through.")
     if r.get("stopped"):
         left = len(r.get("swept") or []) + len(r.get("escaped") or [])
         bits = [f"stopped everything it started ({r.get('reason')})"]
+        if r.get("containers"):
+            bits.append(f"stopped {plural(len(r['containers']), 'container')} it started ({', '.join(r['containers'][:4])})")
         if r.get("removed_triggers"):
             bits.append(f"removed {plural(len(r['removed_triggers']), 'file')} it planted to run later")
         if r.get("restored_triggers"):
@@ -241,7 +245,7 @@ def cmd_report(args):
         return
     print(f"session {s.id}: `{' '.join(meta.get('cmd') or [])}` ({meta.get('status')})")
     print(f"  processes {c.get('processes')}, files made {c.get('made')}, your things kept {c.get('kept')}, "
-          f"reaches refused {c.get('refused')}")
+          f"reaches refused {c.get('refused')}" + (f", Docker things made {c['docker']}" if c.get("docker") else ""))
     kept = b.kept_all()
     if kept:
         print("  your things the agent changed, moved or deleted (originals kept):")
@@ -253,7 +257,10 @@ def cmd_report(args):
                    RETURN p.pid AS by, p.cmd AS bycmd, y.pid AS pid, y.cmd AS cmd, t.detail AS what ORDER BY t.at""")
     for r in tried:
         print(f"  refused: {r['by']} `{(r['bycmd'] or '')[:50]}` sent {r['what']} to your process {r['pid']} `{(r['cmd'] or '')[:50]}`")
-    for e in b.q("MATCH (:Session)-[:LOGGED]->(e:Event) WHERE e.kind IN ['narrowed','swept','adopted'] RETURN e.kind AS k, e.detail AS d ORDER BY e.at"):
+    for r in b.q("""MATCH (p:Process)-[t:TRIED]->(y:Docker)
+                     RETURN p.pid AS by, p.cmd AS bycmd, t.detail AS what ORDER BY t.at"""):
+        print(f"  refused: {r['by']} `{(r['bycmd'] or '')[:50]}` asked the Docker daemon to {r['what']}, which is yours")
+    for e in b.q("MATCH (:Session)-[:LOGGED]->(e:Event) WHERE e.kind IN ['narrowed','swept','adopted','docker'] RETURN e.kind AS k, e.detail AS d ORDER BY e.at"):
         print(f"  {e['k']}: {e['d']}")
     if meta.get("summary"):
         print_summary(meta["summary"])
