@@ -30,7 +30,7 @@
     "lost_paths": [],
     "people": 0,
     "people_alive": 0,
-    "restore": "wake: put back 109 things of yours. Anything that stood in the way is in the vault, not deleted."
+    "restore": "wake: put back 108 things of yours. Anything that stood in the way is in the vault, not deleted."
    }
   },
   {
@@ -63,7 +63,7 @@
     "lost_paths": [],
     "people": 0,
     "people_alive": 0,
-    "restore": "wake: put back 109 things of yours. Anything that stood in the way is in the vault, not deleted."
+    "restore": "wake: put back 108 things of yours. Anything that stood in the way is in the vault, not deleted."
    }
   },
   {
@@ -162,7 +162,7 @@
     "lost_paths": [],
     "people": 0,
     "people_alive": 0,
-    "restore": "wake: put back 108 things of yours. Anything that stood in the way is in the vault, not deleted."
+    "restore": "wake: put back 109 things of yours. Anything that stood in the way is in the vault, not deleted."
    }
   },
   {
@@ -195,7 +195,7 @@
     "lost_paths": [],
     "people": 0,
     "people_alive": 0,
-    "restore": "wake: put back 109 things of yours. Anything that stood in the way is in the vault, not deleted."
+    "restore": "wake: put back 108 things of yours. Anything that stood in the way is in the vault, not deleted."
    }
   },
   {
@@ -327,7 +327,7 @@
     "lost_paths": [],
     "people": 0,
     "people_alive": 0,
-    "restore": "wake: put back 107 things of yours. Anything that stood in the way is in the vault, not deleted."
+    "restore": "wake: put back 106 things of yours. Anything that stood in the way is in the vault, not deleted."
    }
   },
   {
@@ -618,7 +618,31 @@
    "note": "",
    "people": [],
    "needs": "rsync",
-   "skipped": "needs rsync, which this image lacks"
+   "alone": {
+    "files": 80,
+    "lost": 80,
+    "lost_paths": [
+     "/tmp/incident/home/.bashrc",
+     "/tmp/incident/home/apps/editor/editor.bin",
+     "/tmp/incident/home/project/.env",
+     "/tmp/incident/home/project/devlog.md",
+     "/tmp/incident/home/project/README.md",
+     "/tmp/incident/home/project/notes/ideas.md",
+     "/tmp/incident/home/project/docs/journeys/onboarding.md",
+     "/tmp/incident/home/project/docs/journeys/checkout.md"
+    ],
+    "people": 0,
+    "people_alive": 0,
+    "restore": null
+   },
+   "wake": {
+    "files": 80,
+    "lost": 0,
+    "lost_paths": [],
+    "people": 0,
+    "people_alive": 0,
+    "restore": "wake: put back 109 things of yours. Anything that stood in the way is in the vault, not deleted."
+   }
   },
   {
    "id": "C41",

@@ -31,7 +31,7 @@ what each part of the stop is for. Results: `trials/results/law2.json`.
 
 ## Incidents (`trials/incidents.py`)
 
-46 public reports replayed: the person lost something in 46 of 46 with the agent alone (1,084 files, 7
+47 public reports replayed: the person lost something in 47 of 47 with the agent alone (1,164 files, 7
 processes), and in 0 under WAKE. Every row: [INCIDENTS.md](INCIDENTS.md). Results:
 `trials/results/incidents.json`.
 

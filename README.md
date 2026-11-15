@@ -42,14 +42,14 @@ models interfered with their own shutdown up to 97% of the time, even when told 
 
 ## What it does, measured
 
-**46 real incidents, replayed.** We took 46 public reports of agents destroying people's work and ran each
+**47 real incidents, replayed.** We took 47 public reports of agents destroying people's work and ran each
 reported command again, against a person's world built for it: home folder, a git project with uncommitted
 work, photos, notes, a SQLite database, the person's own running processes.
 
 | | Agent alone | Agent under WAKE, then `wake restore` |
 |---|---|---|
-| Incidents where the person lost something | **46 of 46** | **0 of 46** |
-| Files lost | 1,084 | 0 |
+| Incidents where the person lost something | **47 of 47** | **0 of 47** |
+| Files lost | 1,164 | 0 |
 | The person's processes killed | 7 | 0 |
 
 Every replay, its source and its result: [docs/INCIDENTS.md](docs/INCIDENTS.md). Run them yourself:
@@ -221,7 +221,7 @@ with the reasons: [docs/LIMITS.md](docs/LIMITS.md).
 PYTHONPATH=. python3 -m unittest discover -s tests   # 22 tests: the filter on both machines, both laws
 python3 trials/law1.py        # a person's world against destructive commands
 python3 trials/law2.py        # seven ways to keep running, five ways to stop
-python3 trials/incidents.py   # 46 real incidents
+python3 trials/incidents.py   # 47 real incidents
 python3 trials/bench.py       # what it costs
 ```
 
