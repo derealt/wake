@@ -1,5 +1,7 @@
 # WAKE
 
+[![trials](https://github.com/derealt/wake/actions/workflows/trials.yml/badge.svg)](https://github.com/derealt/wake/actions/workflows/trials.yml)
+
 **An AI agent can only destroy what it made. When you stop it, everything it made stops with it.**
 
 WAKE runs an AI agent on your real machine, not in a copy. Any agent that is a program on Linux works: Claude Code
@@ -226,4 +228,6 @@ python3 trials/bench.py       # what it costs
 ```
 
 The trials run as root inside a container and play the person and the agent as an ordinary user.
+On every push, GitHub Actions builds the image from scratch and runs the demo, the tests and every trial on
+x86_64 and arm64 Linux ([trials.yml](.github/workflows/trials.yml)); the result records are kept with each run.
 Each guard was broken on purpose and the test suite went red ([docs/TRIALS.md](docs/TRIALS.md)).

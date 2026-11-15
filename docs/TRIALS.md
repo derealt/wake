@@ -58,6 +58,10 @@ needed), and both laws on a real kernel: deletes, overwrites, moves, moved folde
 symlinks, adoption, WAKE's own records, identity across inode reuse, refused and narrowed signals, the stop,
 two agents on one machine, and a Node.js agent (async file work on libuv's thread pool, a detached child, a kill).
 
+On every push, GitHub Actions builds the image from scratch and runs the demo, all 22 tests and every trial on
+x86_64 and arm64 Linux. First run, 15 November 2026: identical results on both (x86_64 on Linux 7.0): 22 of 22
+tests, both laws, 7/6/5/3/0 of 7, 47 of 47 incidents harmful alone and 0 under WAKE.
+
 **Each guard was broken on purpose, and the suite went red:**
 
 | Broken on purpose | Tests that failed |
